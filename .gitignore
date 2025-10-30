@@ -1,0 +1,90 @@
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Model Checkpoints
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.h5
+
+# Training Logs
+logs/
+wandb/
+runs/
+*.log
+
+# Results & Outputs
+results/
+outputs/
+figures/
+plots/
+*.png
+*.jpg
+*.jpeg
+!*.md  # Keep markdown images
+
+# Data (nếu không muốn commit data)
+# data/datasets/
+# Uncomment dòng trên nếu muốn ignore data
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.cache
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation build
+docs/_build/
+
+# Data and checkpoints (large files)
+data/datasets/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+.conda
+phase1/__pycache__
+phase2/__pycache__
+data/__pycache__
+modules/__pycache__
