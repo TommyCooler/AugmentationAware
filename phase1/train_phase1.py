@@ -225,7 +225,7 @@ def main():
         'window_size': 16,
         'stride': 1,
         'batch_size': 64,
-        'num_epochs': 200,
+        'num_epochs': 1000,
         'learning_rate': 1e-4,
         'temperature': 0.07,
         'projection_dim': 256,

@@ -208,7 +208,7 @@ def main():
         
         # Misc
         'num_workers': 0,
-        'save_dir': 'checkpoints',
+        'save_dir': 'phase2/checkpoints',
         'device': 'cuda' if torch.cuda.is_available() else 'cpu'
     }
     

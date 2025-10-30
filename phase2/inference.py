@@ -200,7 +200,7 @@ class Phase2Inference:
 
 def main():
     parser = argparse.ArgumentParser(description='Phase 2 Inference')
-    parser.add_argument('--checkpoint', type=str, required=True, default='phase2/checkpoints/phase2_ucr_135_best.pt',
+    parser.add_argument('--checkpoint', type=str, default='phase2/checkpoints/phase2_ucr_135_best.pt',
                       help='Path to checkpoint file')
     parser.add_argument('--dataset', type=str, default=None,
                       help='Dataset name (optional, will use from checkpoint if not provided)')
