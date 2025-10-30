@@ -20,6 +20,9 @@ from modules.augmentation import Augmentation
 from phase1.encoder import MLPEncoder, CNNEncoder
 from pytorch_metric_learning import losses
 
+import setproctitle
+setproctitle.setproctitle("Tran Chi Tam - Phase 1 Training")
+
 
 
 class ContrastiveDataset(torch.utils.data.Dataset):
@@ -222,7 +225,7 @@ def main():
         'window_size': 16,
         'stride': 1,
         'batch_size': 64,
-        'num_epochs': 100,
+        'num_epochs': 200,
         'learning_rate': 1e-4,
         'temperature': 0.07,
         'projection_dim': 256,

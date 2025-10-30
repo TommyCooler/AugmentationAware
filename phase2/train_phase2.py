@@ -27,6 +27,9 @@ from data.dataloader import (
 from modules.augmentation import Augmentation
 from phase2.agf_tcn import Agf_TCN
 
+import setproctitle
+setproctitle.setproctitle("Tran Chi Tam - Phase 2 Training")
+
 
 class Phase2Trainer:
     """
@@ -183,7 +186,7 @@ def main():
         
         # Model config
         'agf_tcn_channels': [64, 64],  # TCN hidden channels
-        'dropout': 0.2,
+        'dropout': 0.1,
         'activation': 'gelu',
         'fuse_type': 5,  # TripConFusion
         
@@ -194,7 +197,7 @@ def main():
         # Training config
         'batch_size': 32,
         'num_epochs': 50,
-        'learning_rate': 1e-3,
+        'learning_rate': 1e-4,
         'weight_decay': 1e-6,
         'use_scheduler': False,  # Use learning rate scheduler
         'use_grad_clip': False,  # Use gradient clipping
