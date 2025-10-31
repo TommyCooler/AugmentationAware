@@ -71,8 +71,18 @@ class Phase2Inference:
         )
         self.augmentation.load_state_dict(checkpoint['augmentation_state_dict'])
         self.augmentation.to(device)
+        
+        # Freeze augmentation (should already be frozen, but ensure it)
+        for param in self.augmentation.parameters():
+            param.requires_grad = False
         self.augmentation.eval()
-        print(f"  ✓ Augmentation loaded and frozen")
+        
+        # Verify freezing
+        trainable_params = sum(1 for p in self.augmentation.parameters() if p.requires_grad)
+        if trainable_params == 0:
+            print(f"  ✓ Augmentation loaded and frozen (deterministic mode)")
+        else:
+            print(f"  ⚠ WARNING: {trainable_params} augmentation parameters still trainable!")
         
         # Recreate AGF-TCN
         self.agf_tcn = Agf_TCN(
@@ -92,10 +102,7 @@ class Phase2Inference:
         if 'metrics' in checkpoint:
             metrics = checkpoint['metrics']
             print(f"\n📊 Checkpoint metrics (from training):")
-            print(f"  Test Loss: {metrics.get('test_loss', 'N/A'):.6f}")
-            print(f"  F1 (training threshold): {metrics.get('f1', 'N/A'):.4f}")
-            print(f"  Precision: {metrics.get('precision', 'N/A'):.4f}")
-            print(f"  Recall: {metrics.get('recall', 'N/A'):.4f}")
+            print(f"  Train Loss: {metrics.get('train_loss', 'N/A'):.6f}")
     
     def predict(self, test_loader, threshold=None, search_best_threshold=True, use_point_adjustment=True):
         
@@ -141,9 +148,6 @@ class Phase2Inference:
             search_best_threshold=search_best_threshold
         )
         
-        # Add average reconstruction error
-        metrics['test_loss'] = np.mean(anomaly_scores)
-        
         return metrics, anomaly_scores, true_labels
     
     def print_results(self, metrics):
@@ -151,9 +155,6 @@ class Phase2Inference:
         print("\n" + "="*60)
         print("INFERENCE RESULTS")
         print("="*60)
-        
-        print(f"\n📊 Reconstruction Loss:")
-        print(f"  Test Loss (avg): {metrics['test_loss']:.6f}")
         
         if 'best_threshold' in metrics:
             print(f"\n🎯 Best Threshold Search:")

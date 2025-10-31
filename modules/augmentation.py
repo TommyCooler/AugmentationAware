@@ -258,7 +258,13 @@ class Augmentation(nn.Module):
         
         outputs = torch.stack([linear_out, mlp_out, cnn_out, tcn_out, transformer_out], dim=0)
         
-        probs = F.gumbel_softmax(self.alpha, tau=self.temperature, hard=self.hard, dim=0)
+        # Use softmax in eval mode (deterministic) to ensure stable reconstruction loss
+        # Use gumbel_softmax in train mode (stochastic) for better exploration
+        if self.training:
+            probs = F.gumbel_softmax(self.alpha, tau=self.temperature, hard=self.hard, dim=0)
+        else:
+            # Deterministic softmax for stable inference/training phase 2
+            probs = F.softmax(self.alpha / self.temperature, dim=0)
         
         weighted = outputs * probs.view(-1, 1, 1, 1)
         combined_output = weighted.sum(dim=0)

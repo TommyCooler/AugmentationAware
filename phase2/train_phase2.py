@@ -88,10 +88,32 @@ class Phase2Trainer:
     
     def _freeze_augmentation(self):
         """Freeze all parameters in augmentation module"""
+        frozen_count = 0
+        trainable_count = 0
+        
         for param in self.augmentation.parameters():
-            param.requires_grad = False
+            if param.requires_grad:
+                param.requires_grad = False
+                frozen_count += 1
+            else:
+                trainable_count += 1
+        
         self.augmentation.eval()  # Set to eval mode
-        print("  ✓ Augmentation module frozen")
+        
+        # Verify all parameters are frozen
+        total_params = sum(1 for _ in self.augmentation.parameters())
+        still_trainable = sum(1 for p in self.augmentation.parameters() if p.requires_grad)
+        
+        if still_trainable > 0:
+            print(f"  ⚠ WARNING: {still_trainable}/{total_params} augmentation parameters still trainable!")
+        else:
+            print(f"  ✓ Augmentation module frozen ({frozen_count} parameters)")
+        
+        # Verify eval mode
+        if not next(self.augmentation.parameters()).requires_grad:
+            print(f"  ✓ Augmentation in eval mode (deterministic)")
+        else:
+            print(f"  ⚠ WARNING: Augmentation not properly frozen!")
     
     def train_epoch(self, train_loader, epoch):
         """Train for one epoch"""
