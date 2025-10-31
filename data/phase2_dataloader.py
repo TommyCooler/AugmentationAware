@@ -57,11 +57,12 @@ def prepare_phase2_data(
         train_windows: (n_train, n_channels, window_size)
         train_labels: (n_train,)
         test_windows: (n_test, n_channels, window_size)
-        test_labels: (n_test,)
+        test_labels: (n_test,) - window-level labels
+        labels: (n_time_steps,) - test labels per time-step
     """
     # Load data
     data_path = os.path.join(data_path_base, dataset_name, "labeled")
-    train_data, test_data, test_labels = loader_func(
+    train_data, test_data, labels = loader_func(
         data_path=data_path,
         filename=subset,
         normalized=True
@@ -70,7 +71,7 @@ def prepare_phase2_data(
     print(f"\nLoaded {dataset_name}_{subset}:")
     print(f"  Train data shape: {train_data.shape}")
     print(f"  Test data shape: {test_data.shape}")
-    print(f"  Test labels shape: {test_labels.shape}")
+    print(f"  Test labels shape: {labels.shape}")
     
     # Create sliding windows for train (all labels are 0 - normal)
     train_windows = create_sliding_windows(
@@ -93,7 +94,7 @@ def prepare_phase2_data(
     for i in range(test_windows.shape[0]):
         start_idx = i * stride
         end_idx = start_idx + window_size
-        window_labels = test_labels[start_idx:end_idx]
+        window_labels = labels[start_idx:end_idx]
         # Label as anomaly if any point in window is anomaly
         is_anomaly = 1 if np.any(window_labels > 0) else 0
         test_window_labels.append(is_anomaly)
@@ -104,9 +105,10 @@ def prepare_phase2_data(
     print(f"  Train windows: {train_windows.shape}")
     print(f"  Train labels: {train_labels.shape} (normal: {np.sum(train_labels==0)})")
     print(f"  Test windows: {test_windows.shape}")
-    print(f"  Test labels: {test_window_labels.shape} (normal: {np.sum(test_window_labels==0)}, anomaly: {np.sum(test_window_labels==1)})")
+    print(f"  Test window labels: {test_window_labels.shape} (normal: {np.sum(test_window_labels==0)}, anomaly: {np.sum(test_window_labels==1)})")
+    print(f"  Test labels: {labels.shape} (normal: {np.sum(labels==0)}, anomaly: {np.sum(labels==1)})")
     
-    return train_windows, train_labels, test_windows, test_window_labels
+    return train_windows, train_labels, test_windows, test_window_labels, labels
 
 
 def create_phase2_dataloaders(

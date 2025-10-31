@@ -100,19 +100,23 @@ def point_adjustment(
 
 def compute_pa_metrics(
     predictions: np.ndarray,
-    labels: np.ndarray,
-    apply_pa: bool = True
+    labels: np.ndarray
 ) -> dict:
+    """
+    Compute metrics with Point Adjustment (always applied).
     
+    Args:
+        predictions: Binary predictions (0 or 1)
+        labels: Ground truth labels (0 or 1)
+    
+    Returns:
+        Dictionary with metrics and PA info
+    """
     predictions = predictions.astype(int)
     labels = labels.astype(int)
     
-    if apply_pa:
-        # Apply point adjustment
-        adjusted_predictions, pa_info = point_adjustment(predictions, labels)
-    else:
-        adjusted_predictions = predictions
-        pa_info = {'total_segments': 0, 'detected_segments': 0}
+    # Always apply point adjustment
+    adjusted_predictions, pa_info = point_adjustment(predictions, labels)
     
     # Compute confusion matrix
     TP = np.sum((adjusted_predictions == 1) & (labels == 1))
@@ -144,10 +148,20 @@ def compute_pa_metrics(
 def compute_best_f1_with_threshold_search(
     anomaly_scores: np.ndarray,
     labels: np.ndarray,
-    apply_pa: bool = True,
     n_thresholds: int = 200
 ) -> Tuple[float, float, dict]:
+    """
+    Search for best threshold that maximizes F1-score.
+    Always uses Point Adjustment.
     
+    Args:
+        anomaly_scores: Anomaly scores per time step
+        labels: Ground truth labels
+        n_thresholds: Number of candidate thresholds to test
+    
+    Returns:
+        (best_f1, best_threshold, best_metrics)
+    """
     # Generate candidate thresholds
     min_score = np.min(anomaly_scores)
     max_score = np.max(anomaly_scores)
@@ -161,8 +175,8 @@ def compute_best_f1_with_threshold_search(
         # Convert scores to predictions
         predictions = (anomaly_scores >= threshold).astype(int)
         
-        # Compute metrics
-        metrics = compute_pa_metrics(predictions, labels, apply_pa=apply_pa)
+        # Compute metrics (always with PA)
+        metrics = compute_pa_metrics(predictions, labels)
         
         if metrics['f1'] > best_f1:
             best_f1 = metrics['f1']
@@ -174,41 +188,39 @@ def compute_best_f1_with_threshold_search(
 
 def evaluate_with_pa(
     anomaly_scores: np.ndarray,
-    labels: np.ndarray,
-    threshold: float = None,
-    apply_pa: bool = True,
-    search_best_threshold: bool = False
+    labels: np.ndarray
 ) -> dict:
+    """
+    Evaluate anomaly detection with Point Adjustment.
+    Always searches for best threshold (maximize F1) and applies Point Adjustment.
+    
+    Args:
+        anomaly_scores: Anomaly scores per time step
+        labels: Ground truth labels
+    
+    Returns:
+        Dictionary with best_threshold, best_f1, metrics, and predictions
+    """
+    # Always search for best threshold (with PA)
+    best_f1, best_threshold, best_metrics = compute_best_f1_with_threshold_search(
+        anomaly_scores, labels
+    )
     
     results = {
-        'pa_enabled': apply_pa
+        'best_f1': best_f1,
+        'best_threshold': best_threshold,
+        'threshold': best_threshold  # Use best threshold as the threshold
     }
     
-    # If searching for best threshold
-    if search_best_threshold:
-        best_f1, best_threshold, best_metrics = compute_best_f1_with_threshold_search(
-            anomaly_scores, labels, apply_pa=apply_pa
-        )
-        results['best_f1'] = best_f1
-        results['best_threshold'] = best_threshold
-        results.update({f'best_{k}': v for k, v in best_metrics.items()})
-        
-        # When searching for best, also use the best threshold as the default threshold
-        # This makes the results consistent - we use the best threshold we found
-        threshold = best_threshold
-    else:
-        # If not searching, use provided threshold or default to 95th percentile
-        if threshold is None:
-            threshold = np.percentile(anomaly_scores, 95)
+    # Update with best metrics
+    results.update({f'best_{k}': v for k, v in best_metrics.items()})
     
-    # Convert to predictions and compute metrics at the chosen threshold
-    predictions = (anomaly_scores >= threshold).astype(int)
+    # Convert to predictions at best threshold
+    predictions = (anomaly_scores >= best_threshold).astype(int)
+    results['predictions'] = predictions  # Include predictions for visualization
     
-    # Compute PA metrics at this threshold (F1, Precision, Recall, Accuracy)
-    metrics = compute_pa_metrics(predictions, labels, apply_pa=apply_pa)
-    
-    results['threshold'] = threshold
-    results.update(metrics)
+    # Compute final metrics (should be same as best_metrics, but keeping for consistency)
+    results.update(best_metrics)
     
     return results
 
@@ -228,20 +240,13 @@ if __name__ == '__main__':
     predictions[120:130] = 1  # Detected part of 1st segment
     predictions[800:810] = 1  # False positive
     
-    # Without PA
-    print("WITHOUT Point Adjustment:")
-    metrics_no_pa = compute_pa_metrics(predictions, labels, apply_pa=False)
-    print(f"  Precision: {metrics_no_pa['precision']:.4f}")
-    print(f"  Recall: {metrics_no_pa['recall']:.4f}")
-    print(f"  F1: {metrics_no_pa['f1']:.4f}")
-    
-    # With PA
-    print("\nWITH Point Adjustment:")
-    metrics_pa = compute_pa_metrics(predictions, labels, apply_pa=True)
-    print(f"  Precision: {metrics_pa['precision']:.4f}")
-    print(f"  Recall: {metrics_pa['recall']:.4f}")
-    print(f"  F1: {metrics_pa['f1']:.4f}")
-    print(f"  Segments detected: {metrics_pa['detected_segments']}/{metrics_pa['total_segments']}")
+    # With Point Adjustment (always applied)
+    print("WITH Point Adjustment:")
+    metrics = compute_pa_metrics(predictions, labels)
+    print(f"  Precision: {metrics['precision']:.4f}")
+    print(f"  Recall: {metrics['recall']:.4f}")
+    print(f"  F1: {metrics['f1']:.4f}")
+    print(f"  Segments detected: {metrics['detected_segments']}/{metrics['total_segments']}")
     
     # With threshold search
     anomaly_scores = np.random.random(1000)
@@ -249,7 +254,7 @@ if __name__ == '__main__':
     
     print("\nWith Threshold Search:")
     best_f1, best_threshold, best_metrics = compute_best_f1_with_threshold_search(
-        anomaly_scores, labels, apply_pa=True
+        anomaly_scores, labels
     )
     print(f"  Best F1: {best_f1:.4f}")
     print(f"  Best threshold: {best_threshold:.4f}")

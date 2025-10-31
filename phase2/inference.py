@@ -9,7 +9,6 @@ hoặc tùy chỉnh:
 """
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 import os
 import sys
@@ -30,6 +29,123 @@ from data.dataloader import (
 from modules.augmentation import Augmentation
 from phase2.agf_tcn import Agf_TCN
 from utils.point_adjustment import evaluate_with_pa
+from phase2.visualize import visualize_inference_results
+
+
+def map_window_data_to_timeseries(
+    window_data_all: np.ndarray,
+    n_time_steps: int,
+    window_size: int,
+    stride: int
+) -> np.ndarray:
+    """
+    Map window-level data back to time series
+    
+    Args:
+        window_data_all: shape (n_windows, n_channels, window_size) - data for all windows
+        n_time_steps: Total number of time steps in original time series
+        window_size: Size of each window
+        stride: Stride between windows
+    
+    Returns:
+        timeseries_data: shape (n_channels, n_time_steps)
+    """
+    n_windows, n_channels, _ = window_data_all.shape
+    timeseries_data = np.full((n_channels, n_time_steps), np.nan, dtype=np.float32)
+    
+    # Window 0: Map all time steps
+    window_0_data = window_data_all[0]  # (n_channels, window_size)
+    timeseries_data[:, :window_size] = window_0_data
+    
+    # Subsequent windows: Only map last time step
+    for i in range(1, n_windows):
+        start_idx = i * stride
+        last_time_step_idx = start_idx + window_size - 1
+        
+        if last_time_step_idx < n_time_steps:
+            last_timestep_data = window_data_all[i, :, -1]  # (n_channels,)
+            
+            # Map data (no overlap because we only take the last time-step)
+            timeseries_data[:, last_time_step_idx] = last_timestep_data
+    
+    # Forward fill NaN values
+    for ch in range(n_channels):
+        mask = ~np.isnan(timeseries_data[ch])
+        if np.any(mask):
+            timeseries_data[ch] = np.interp(
+                np.arange(n_time_steps),
+                np.arange(n_time_steps)[mask],
+                timeseries_data[ch][mask]
+            )
+        else:
+            timeseries_data[ch] = 0.0
+    
+    return timeseries_data
+
+
+def map_window_scores_to_timeseries(
+    timestep_scores_all_windows: np.ndarray,
+    n_time_steps: int,
+    window_size: int,
+    stride: int
+) -> np.ndarray:
+    """
+    Map window-based per-time-step scores back to original time series.
+    
+    Strategy:
+    - Window 0: map all time-step scores to [0:window_size]
+    - Window i (i>0): map only the LAST time-step score (at index window_size-1) 
+                      to time step (start_idx + window_size - 1)
+    
+    Args:
+        timestep_scores_all_windows: (n_windows, window_size) - per-time-step scores for each window
+        n_time_steps: Number of time steps in original time series
+        window_size: Size of each window
+        stride: Stride between windows
+    
+    Returns:
+        timeseries_scores: (n_time_steps,) - anomaly scores for each time step
+    """
+    n_windows = timestep_scores_all_windows.shape[0]
+    
+    # Initialize arrays
+    timeseries_scores = np.full(n_time_steps, np.nan, dtype=np.float32)
+    
+    # Map window 0: all time steps
+    window_0_start = 0
+    window_0_end = window_size
+    # Extract per-time-step scores for window 0
+    window_0_scores = timestep_scores_all_windows[0]  # Shape: (window_size,)
+    timeseries_scores[window_0_start:window_0_end] = window_0_scores
+    
+    # Map subsequent windows: only last time step
+    for i in range(1, n_windows):
+        start_idx = i * stride
+        end_idx = start_idx + window_size
+        last_time_step = end_idx - 1  # Last time step in this window
+        
+        # Only map to last time step if it's within bounds
+        if last_time_step < n_time_steps:
+            # Extract the last time-step score from this window
+            last_timestep_score = timestep_scores_all_windows[i, -1]
+            
+            # Map score (no overlap because we only take the last time-step)
+            timeseries_scores[last_time_step] = last_timestep_score
+            
+    
+    # Fill NaN values (if any) with forward fill
+    # This handles edge cases where some time steps might not have scores
+    valid_mask = ~np.isnan(timeseries_scores)
+    if not valid_mask.all():
+        # Forward fill from last valid value
+        last_valid_idx = -1
+        for i in range(n_time_steps):
+            if valid_mask[i]:
+                last_valid_idx = i
+            elif last_valid_idx >= 0:
+                timeseries_scores[i] = timeseries_scores[last_valid_idx]
+    
+    return timeseries_scores
 
 
 class Phase2Inference:
@@ -71,18 +187,8 @@ class Phase2Inference:
         )
         self.augmentation.load_state_dict(checkpoint['augmentation_state_dict'])
         self.augmentation.to(device)
-        
-        # Freeze augmentation (should already be frozen, but ensure it)
-        for param in self.augmentation.parameters():
-            param.requires_grad = False
-        self.augmentation.eval()
-        
-        # Verify freezing
-        trainable_params = sum(1 for p in self.augmentation.parameters() if p.requires_grad)
-        if trainable_params == 0:
-            print(f"  ✓ Augmentation loaded and frozen (deterministic mode)")
-        else:
-            print(f"  ⚠ WARNING: {trainable_params} augmentation parameters still trainable!")
+        self.augmentation.eval()  # Disable dropout and set batchnorm to eval mode
+        print(f"  ✓ Augmentation loaded")
         
         # Recreate AGF-TCN
         self.agf_tcn = Agf_TCN(
@@ -104,51 +210,85 @@ class Phase2Inference:
             print(f"\n📊 Checkpoint metrics (from training):")
             print(f"  Train Loss: {metrics.get('train_loss', 'N/A'):.6f}")
     
-    def predict(self, test_loader, threshold=None, search_best_threshold=True, use_point_adjustment=True):
-        
-        # Ensure models are in eval mode (disable dropout, batch norm, etc.)
-        self.augmentation.eval()
-        self.agf_tcn.eval()
-        
+    def predict(self, test_loader, stride=None, labels=None, save_visualization_data=False):
+
         print("\n🔮 Running inference...")
-        all_losses = []
-        all_labels = []
+        all_timestep_scores = []
+        all_original_data = []
+        all_augmented_data = []
+        all_reconstructed_data = []
         
         with torch.no_grad():
-            for batch_data, batch_labels in tqdm(test_loader, desc="Computing anomaly scores"):
+            for batch_data, _ in tqdm(test_loader, desc="Computing anomaly scores"):
                 batch_data = batch_data.to(self.device)
                 
-                # Get augmented data
                 augmented_data = self.augmentation(batch_data)
-                
-                # Reconstruct
                 reconstructed = self.agf_tcn(augmented_data)
+                timestep_losses = torch.mean((reconstructed - augmented_data) ** 2, dim=1)
                 
-                # Compute reconstruction error per sample
-                batch_losses = torch.mean((reconstructed - augmented_data) ** 2, dim=(1, 2))
+                all_timestep_scores.append(timestep_losses.cpu().numpy())
                 
-                all_losses.append(batch_losses.cpu().numpy())
-                all_labels.append(batch_labels.cpu().numpy())
+                if save_visualization_data:
+                    all_original_data.append(batch_data.cpu().numpy())
+                    all_augmented_data.append(augmented_data.cpu().numpy())
+                    all_reconstructed_data.append(reconstructed.cpu().numpy())
         
-        # Concatenate all results
-        anomaly_scores = np.concatenate(all_losses)
-        true_labels = np.concatenate(all_labels).astype(int)
+        timestep_scores_all_windows = np.concatenate(all_timestep_scores, axis=0)
         
-        print(f"  ✓ Computed {len(anomaly_scores)} anomaly scores")
+        print(f"  ✓ Computed anomaly scores for {len(timestep_scores_all_windows)} windows")
+        print(f"   Each window has {timestep_scores_all_windows.shape[1]} time-step scores")
         
-        # Evaluate with Point Adjustment
-        if search_best_threshold:
-            print("\n🔍 Searching for best threshold...")
+        stride = stride if stride is not None else self.config.get('stride', 1)
+        window_size = self.config['window_size']
+        
+        print(f"\n🔄 Mapping window scores to time series...")
+        print(f"   Window size: {window_size}, Stride: {stride}")
+        print(f"   Strategy: Window 0 → all time-steps, Window i>0 → last time-step only")
+        
+        anomaly_scores = map_window_scores_to_timeseries(
+            timestep_scores_all_windows=timestep_scores_all_windows,
+            n_time_steps=len(labels),
+            window_size=window_size,
+            stride=stride
+        )
+        
+        print(f"  ✓ Mapped to {len(anomaly_scores)} time steps")
+        print(f"   Coverage: {np.sum(~np.isnan(anomaly_scores))}/{len(anomaly_scores)} steps have scores")
+        
+        # Evaluate with Point Adjustment (always searches for best threshold)
+        print("\n🔍 Searching for best threshold (with Point Adjustment)...")
         
         metrics = evaluate_with_pa(
             anomaly_scores=anomaly_scores,
-            labels=true_labels,
-            threshold=threshold,
-            apply_pa=use_point_adjustment,
-            search_best_threshold=search_best_threshold
+            labels=labels
         )
         
-        return metrics, anomaly_scores, true_labels
+        # Map visualization data to time series if requested
+        visualization_data = None
+        if save_visualization_data:
+            print(f"\n📊 Preparing visualization data...")
+            original_windows = np.concatenate(all_original_data, axis=0)
+            augmented_windows = np.concatenate(all_augmented_data, axis=0)
+            reconstructed_windows = np.concatenate(all_reconstructed_data, axis=0)
+            
+            original_timeseries = map_window_data_to_timeseries(
+                original_windows, len(labels), window_size, stride
+            )
+            augmented_timeseries = map_window_data_to_timeseries(
+                augmented_windows, len(labels), window_size, stride
+            )
+            reconstructed_timeseries = map_window_data_to_timeseries(
+                reconstructed_windows, len(labels), window_size, stride
+            )
+            
+            visualization_data = {
+                'original': original_timeseries,
+                'augmented': augmented_timeseries,
+                'reconstructed': reconstructed_timeseries
+            }
+            print(f"  ✓ Visualization data prepared")
+        
+        return metrics, anomaly_scores, labels, visualization_data
     
     def print_results(self, metrics):
         """In kết quả inference"""
@@ -194,12 +334,8 @@ def main():
                       help='Dataset subset (optional, will use from checkpoint if not provided)')
     parser.add_argument('--batch_size', type=int, default=None,
                       help='Batch size for inference (optional, will use from checkpoint if not provided)')
-    parser.add_argument('--threshold', type=float, default=None,
-                      help='Fixed threshold (if not set, will search for best)')
-    parser.add_argument('--no_pa', action='store_true',
-                      help='Disable Point Adjustment')
-    parser.add_argument('--no_search', action='store_true',
-                      help='Disable threshold search (use 95th percentile)')
+    parser.add_argument('--no_viz', action='store_true',
+                      help='Disable visualization')
     parser.add_argument('--device', type=str, default=None,
                       help='Device (cuda/cpu), auto-detect if not set')
     
@@ -239,9 +375,8 @@ def main():
     }
     
     loader_func = dataloader_func[dataset_name]
-    
-    # Prepare data (CHỈ load test data cho inference)
-    _, _, test_windows, test_labels = prepare_phase2_data(
+
+    _, _, test_windows, test_labels, labels = prepare_phase2_data(
         dataset_name=dataset_name,
         subset=subset,
         loader_func=loader_func,
@@ -251,7 +386,8 @@ def main():
     )
     
     print(f"  ✓ Test set: {len(test_windows)} windows")
-    print(f"  ✓ Anomaly rate: {test_labels.sum() / len(test_labels) * 100:.2f}%")
+    print(f"  ✓ Time series length: {len(labels)}")
+    print(f"  ✓ Anomaly rate: {labels.sum() / len(labels) * 100:.2f}%")
     
     # Create test dataloader only
     print("\n[2/3] Creating test dataloader...")
@@ -266,15 +402,39 @@ def main():
     
     # Run inference
     print("\n[3/3] Running inference...")
-    metrics, anomaly_scores, true_labels = inferencer.predict(
+    metrics, anomaly_scores, labels, visualization_data = inferencer.predict(
         test_loader,
-        threshold=args.threshold,
-        search_best_threshold=not args.no_search,
-        use_point_adjustment=not args.no_pa
+        stride=config.get('stride', 1),
+        labels=labels,
+        save_visualization_data=not args.no_viz
     )
     
     # Print results
     inferencer.print_results(metrics)
+    
+    # Visualization
+    if visualization_data is not None:
+        print("\n📊 Generating visualization...")
+        threshold = metrics.get('best_threshold', metrics.get('threshold'))
+        predictions = metrics.get('predictions')
+        
+        viz_output_dir = os.path.join(project_root, 'results', 'visualizations')
+        os.makedirs(viz_output_dir, exist_ok=True)
+        viz_save_path = os.path.join(
+            viz_output_dir,
+            f"viz_{dataset_name}_{subset}.png"
+        )
+        
+        visualize_inference_results(
+            original_data=visualization_data['original'],
+            augmented_data=visualization_data['augmented'],
+            reconstructed_data=visualization_data['reconstructed'],
+            anomaly_scores=anomaly_scores,
+            labels=labels,
+            predictions=predictions,
+            threshold=threshold,
+            save_path=viz_save_path
+        )
     
     # Save results (optional)
     output_dir = os.path.join(project_root, 'results')
@@ -288,7 +448,7 @@ def main():
     np.savez(
         output_file,
         anomaly_scores=anomaly_scores,
-        true_labels=true_labels,
+        labels=labels,
         metrics=metrics
     )
     
