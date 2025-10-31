@@ -7,8 +7,7 @@ from .point_adjustment import (
     point_adjustment,
     compute_pa_metrics,
     compute_best_f1_with_threshold_search,
-    evaluate_with_pa,
-    evaluate_simple
+    evaluate_with_pa
 )
 
 __all__ = [
@@ -16,7 +15,6 @@ __all__ = [
     'point_adjustment',
     'compute_pa_metrics',
     'compute_best_f1_with_threshold_search',
-    'evaluate_with_pa',
-    'evaluate_simple'
+    'evaluate_with_pa'
 ]
 

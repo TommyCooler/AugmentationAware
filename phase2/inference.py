@@ -38,13 +38,6 @@ class Phase2Inference:
     """
     
     def __init__(self, checkpoint_path, device='cuda' if torch.cuda.is_available() else 'cpu'):
-        """
-        Load trained model từ checkpoint
-        
-        Args:
-            checkpoint_path: Đường dẫn đến checkpoint
-            device: 'cuda' hoặc 'cpu'
-        """
         self.device = device
         self.checkpoint_path = checkpoint_path
         
@@ -105,20 +98,12 @@ class Phase2Inference:
             print(f"  Recall: {metrics.get('recall', 'N/A'):.4f}")
     
     def predict(self, test_loader, threshold=None, search_best_threshold=True, use_point_adjustment=True):
-        """
-        Dự đoán anomalies trên test set
         
-        Args:
-            test_loader: DataLoader cho test data
-            threshold: Threshold cố định (nếu None và search_best_threshold=False, dùng 95th percentile)
-            search_best_threshold: Nếu True, tìm best threshold maximize F1
-            use_point_adjustment: Sử dụng Point Adjustment protocol
-            
-        Returns:
-            metrics: Dictionary chứa results
-        """
+        # Ensure models are in eval mode (disable dropout, batch norm, etc.)
+        self.augmentation.eval()
+        self.agf_tcn.eval()
+        
         print("\n🔮 Running inference...")
-        
         all_losses = []
         all_labels = []
         

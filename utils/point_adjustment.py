@@ -46,21 +46,7 @@ def point_adjustment(
     predictions: np.ndarray,
     labels: np.ndarray
 ) -> Tuple[np.ndarray, dict]:
-    """
-    Point Adjustment algorithm for anomaly detection evaluation.
-    Expands predicted anomalies to cover the entire ground truth anomaly region
-    when at least one point in the region is correctly predicted.
-    
-    This is the standard implementation used in TSB-UAD and other benchmarks.
-    
-    Args:
-        predictions: Binary predictions (0: normal, 1: anomaly)
-        labels: Binary ground truth labels (0: normal, 1: anomaly)
-    
-    Returns:
-        adjusted_predictions: Adjusted binary predictions
-        info: Dictionary with adjustment statistics
-    """
+
     gt = labels.copy().astype(int)
     pred = predictions.copy().astype(int)
     
@@ -117,17 +103,7 @@ def compute_pa_metrics(
     labels: np.ndarray,
     apply_pa: bool = True
 ) -> dict:
-    """
-    Compute evaluation metrics with Point Adjustment
     
-    Args:
-        predictions: Binary predictions (0: normal, 1: anomaly)
-        labels: Binary ground truth labels (0: normal, 1: anomaly)
-        apply_pa: If True, apply point adjustment protocol
-    
-    Returns:
-        Dictionary of metrics
-    """
     predictions = predictions.astype(int)
     labels = labels.astype(int)
     
@@ -171,20 +147,7 @@ def compute_best_f1_with_threshold_search(
     apply_pa: bool = True,
     n_thresholds: int = 200
 ) -> Tuple[float, float, dict]:
-    """
-    Find best threshold and F1-score by searching over possible thresholds
     
-    Args:
-        anomaly_scores: Continuous anomaly scores (higher = more anomalous)
-        labels: Binary ground truth labels
-        apply_pa: If True, apply point adjustment
-        n_thresholds: Number of thresholds to try
-    
-    Returns:
-        best_f1: Best F1-score found
-        best_threshold: Threshold that gives best F1
-        best_metrics: Full metrics at best threshold
-    """
     # Generate candidate thresholds
     min_score = np.min(anomaly_scores)
     max_score = np.max(anomaly_scores)
@@ -216,19 +179,7 @@ def evaluate_with_pa(
     apply_pa: bool = True,
     search_best_threshold: bool = False
 ) -> dict:
-    """
-    Evaluation with Point Adjustment - F1, Precision, Recall
     
-    Args:
-        anomaly_scores: Continuous anomaly scores
-        labels: Binary ground truth labels
-        threshold: Decision threshold (if None, use 95th percentile)
-        apply_pa: If True, apply point adjustment protocol
-        search_best_threshold: If True, search for best threshold
-    
-    Returns:
-        Dictionary with F1, Precision, Recall, Accuracy
-    """
     results = {
         'pa_enabled': apply_pa
     }
@@ -241,12 +192,16 @@ def evaluate_with_pa(
         results['best_f1'] = best_f1
         results['best_threshold'] = best_threshold
         results.update({f'best_{k}': v for k, v in best_metrics.items()})
+        
+        # When searching for best, also use the best threshold as the default threshold
+        # This makes the results consistent - we use the best threshold we found
+        threshold = best_threshold
+    else:
+        # If not searching, use provided threshold or default to 95th percentile
+        if threshold is None:
+            threshold = np.percentile(anomaly_scores, 95)
     
-    # If threshold provided or default
-    if threshold is None:
-        threshold = np.percentile(anomaly_scores, 95)
-    
-    # Convert to predictions
+    # Convert to predictions and compute metrics at the chosen threshold
     predictions = (anomaly_scores >= threshold).astype(int)
     
     # Compute PA metrics at this threshold (F1, Precision, Recall, Accuracy)
@@ -256,40 +211,6 @@ def evaluate_with_pa(
     results.update(metrics)
     
     return results
-
-
-def evaluate_simple(
-    anomaly_scores: np.ndarray,
-    labels: np.ndarray,
-    threshold: float = None,
-    apply_pa: bool = True
-) -> dict:
-    """
-    Simple evaluation - only F1, Precision, Recall (no AUC, no threshold search)
-    
-    Args:
-        anomaly_scores: Continuous anomaly scores
-        labels: Binary ground truth labels
-        threshold: Decision threshold (if None, use 95th percentile)
-        apply_pa: If True, apply point adjustment protocol
-    
-    Returns:
-        Dictionary with F1, Precision, Recall, Accuracy
-    """
-    # Auto-compute threshold if not provided
-    if threshold is None:
-        threshold = np.percentile(anomaly_scores, 95)
-    
-    # Convert to binary predictions
-    predictions = (anomaly_scores >= threshold).astype(int)
-    
-    # Compute PA metrics (F1, Precision, Recall, Accuracy)
-    metrics = compute_pa_metrics(predictions, labels, apply_pa=apply_pa)
-    
-    # Add threshold to results
-    metrics['threshold'] = threshold
-    
-    return metrics
 
 
 # Example usage

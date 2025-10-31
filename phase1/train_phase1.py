@@ -250,9 +250,9 @@ def main():
     # Example: UCR datasets 135-138
     datasets_info = [
         {'name': 'ucr', 'subset': '135', 'loader': 'ucr'},
-        {'name': 'ucr', 'subset': '136', 'loader': 'ucr'},
-        {'name': 'ucr', 'subset': '137', 'loader': 'ucr'},
-        {'name': 'ucr', 'subset': '138', 'loader': 'ucr'},
+        # {'name': 'ucr', 'subset': '136', 'loader': 'ucr'},
+        # {'name': 'ucr', 'subset': '137', 'loader': 'ucr'},
+        # {'name': 'ucr', 'subset': '138', 'loader': 'ucr'},
     ]
     
     # Dataloader function mapping

@@ -101,7 +101,7 @@ class Phase2Trainer:
         total_loss = 0.0
         
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
-        for batch_idx, (batch_data, batch_labels) in enumerate(pbar):
+        for batch_idx, (batch_data, _) in enumerate(pbar):  # Labels not used in reconstruction training
             batch_data = batch_data.to(self.device)
             
             # Forward pass
@@ -195,7 +195,7 @@ def main():
         'transformer_nhead': 2,       # Number of attention heads (must be even)
         
         # Training config
-        'batch_size': 32,
+        'batch_size': 64,
         'num_epochs': 50,
         'learning_rate': 1e-4,
         'weight_decay': 1e-6,
