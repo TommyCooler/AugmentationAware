@@ -41,7 +41,7 @@ def prepare_phase2_data(
     window_size: int,
     stride: int,
     data_path_base: str = "data/datasets"
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Load and prepare data for Phase 2 training
     
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     from data.dataloader import ucr_sub_ds_processing
     
     # Test with UCR 135
-    train_windows, train_labels, test_windows, test_labels = prepare_phase2_data(
+    train_windows, train_labels, test_windows, test_labels, labels = prepare_phase2_data(
         dataset_name='ucr',
         subset='135',
         loader_func=ucr_sub_ds_processing,

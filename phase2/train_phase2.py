@@ -255,7 +255,7 @@ def main():
     loader_func = dataloader_func[config['dataset_name']]
     
     # Load data (chỉ dùng train, test data cho inference)
-    train_windows, train_labels, _, _ = prepare_phase2_data(
+    train_windows, train_labels, _, _, _ = prepare_phase2_data(
         dataset_name=config['dataset_name'],
         subset=config['subset'],
         loader_func=loader_func,
