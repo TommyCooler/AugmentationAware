@@ -94,52 +94,52 @@ def create_train_test_windows(
     return train_windows, test_windows
 
 
-def find_valid_strides(time_steps: int, window_size: int) -> list:
-    """
-    Tìm tất cả các giá trị stride hợp lệ cho dữ liệu.
+# def find_valid_strides(time_steps: int, window_size: int) -> list:
+#     """
+#     Tìm tất cả các giá trị stride hợp lệ cho dữ liệu.
     
-    Args:
-        time_steps: Độ dài time series
-        window_size: Kích thước window
+#     Args:
+#         time_steps: Độ dài time series
+#         window_size: Kích thước window
     
-    Returns:
-        List các giá trị stride hợp lệ (các ước của time_steps - window_size)
-    """
-    if time_steps < window_size:
-        return []
+#     Returns:
+#         List các giá trị stride hợp lệ (các ước của time_steps - window_size)
+#     """
+#     if time_steps < window_size:
+#         return []
     
-    diff = time_steps - window_size
-    if diff == 0:
-        return [1]  # Chỉ có 1 window
+#     diff = time_steps - window_size
+#     if diff == 0:
+#         return [1]  # Chỉ có 1 window
     
-    # Tìm tất cả ước của diff
-    valid_strides = []
-    for i in range(1, diff + 1):
-        if diff % i == 0:
-            valid_strides.append(i)
+#     # Tìm tất cả ước của diff
+#     valid_strides = []
+#     for i in range(1, diff + 1):
+#         if diff % i == 0:
+#             valid_strides.append(i)
     
-    return valid_strides
+#     return valid_strides
 
 
-def batch_windows(windows: np.ndarray, batch_size: int) -> list:
-    """
-    Chia windows thành các batches.
+# def batch_windows(windows: np.ndarray, batch_size: int) -> list:
+#     """
+#     Chia windows thành các batches.
     
-    Args:
-        windows: Array với shape (n_windows, n_channels, window_size)
-        batch_size: Kích thước của mỗi batch
+#     Args:
+#         windows: Array với shape (n_windows, n_channels, window_size)
+#         batch_size: Kích thước của mỗi batch
     
-    Returns:
-        List các batches
-    """
-    n_windows = windows.shape[0]
-    batches = []
+#     Returns:
+#         List các batches
+#     """
+#     n_windows = windows.shape[0]
+#     batches = []
     
-    for i in range(0, n_windows, batch_size):
-        batch = windows[i:min(i + batch_size, n_windows)]
-        batches.append(batch)
+#     for i in range(0, n_windows, batch_size):
+#         batch = windows[i:min(i + batch_size, n_windows)]
+#         batches.append(batch)
     
-    return batches
+#     return batches
 
 
 # Example usage
@@ -159,10 +159,10 @@ if __name__ == "__main__":
     print(f"Window size: {window_size}\n")
     
     # Tìm các stride hợp lệ
-    print("--- Các stride hợp lệ cho train data ---")
-    valid_strides_train = find_valid_strides(time_steps, window_size)
-    print(f"Có {len(valid_strides_train)} giá trị stride hợp lệ")
-    print(f"Một số ví dụ: {valid_strides_train[:10]}\n")
+    # print("--- Các stride hợp lệ cho train data ---")
+    # valid_strides_train = find_valid_strides(time_steps, window_size)
+    # print(f"Có {len(valid_strides_train)} giá trị stride hợp lệ")
+    # print(f"Một số ví dụ: {valid_strides_train[:10]}\n")
     
     # Demo với stride hợp lệ
     print("--- Test với stride HỢP LỆ (stride=50) ---")
@@ -198,7 +198,7 @@ if __name__ == "__main__":
         print(f"{e}\n")
     
     # Gợi ý stride cho user
-    print("--- Gợi ý stride hợp lý ---")
-    suggestions = [s for s in valid_strides_train if 1 < s <= 100][:5]
-    print(f"Các stride từ 2-100: {suggestions}")
+    # print("--- Gợi ý stride hợp lý ---")
+    # suggestions = [s for s in valid_strides_train if 1 < s <= 100][:5]
+    # print(f"Các stride từ 2-100: {suggestions}")
 

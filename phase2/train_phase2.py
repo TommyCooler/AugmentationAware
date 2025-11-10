@@ -25,6 +25,7 @@ from data.dataloader import (
     psm_sub_ds_processing
 )
 from modules.augmentation import Augmentation
+from modules.random_masking import RandomTimeMasking
 from phase2.agf_tcn import Agf_TCN
 
 import setproctitle
@@ -46,11 +47,21 @@ class Phase2Trainer:
         use_scheduler: bool = True,
         use_grad_clip: bool = True,
         max_grad_norm: float = 1.0,
-        config: dict = None  # Store config for inference
+        config: dict = None,  # Store config for inference
+        mask_ratio: float = 0.15,  # Random time masking ratio
+        mask_value: str = 'zero',  # 'zero', 'mean', or 'noise'
+        mask_mode: str = 'temporal'  # 'temporal' or 'channel_wise'
     ):
         self.augmentation = augmentation.to(device)
         self.agf_tcn = agf_tcn.to(device)
         self.device = device
+        
+        # Initialize random time masking
+        self.time_masking = RandomTimeMasking(
+            mask_ratio=mask_ratio,
+            mask_value=mask_value,
+            mask_mode=mask_mode
+        ).to(device)
         self.use_scheduler = use_scheduler
         self.use_grad_clip = use_grad_clip
         self.max_grad_norm = max_grad_norm
@@ -119,6 +130,7 @@ class Phase2Trainer:
         """Train for one epoch"""
         self.agf_tcn.train()
         self.augmentation.eval()  # Keep augmentation in eval mode
+        self.time_masking.train()  # Enable masking during training
         
         total_loss = 0.0
         
@@ -126,10 +138,13 @@ class Phase2Trainer:
         for batch_idx, (batch_data, _) in enumerate(pbar):  # Labels not used in reconstruction training
             batch_data = batch_data.to(self.device)
             
+            # Apply random time masking before augmentation
+            masked_data = self.time_masking(batch_data)
+            
             # Forward pass
             with torch.no_grad():
                 # Get augmented data (frozen augmentation)
-                augmented_data = self.augmentation(batch_data)
+                augmented_data = self.augmentation(masked_data)
             
             # Reconstruct from augmented data
             reconstructed = self.agf_tcn(augmented_data)
@@ -224,6 +239,11 @@ def main():
         'use_scheduler': False,  # Use learning rate scheduler
         'use_grad_clip': False,  # Use gradient clipping
         'max_grad_norm': 1.0,   # Max gradient norm for clipping
+        
+        # Random time masking options
+        'mask_ratio': 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
+        'mask_value': 'zero',  # 'zero', 'mean', or 'noise'
+        'mask_mode': 'temporal',  # 'temporal' or 'channel_wise'
         
         # Phase 1 checkpoint (pre-trained augmentation)
         'phase1_checkpoint': 'phase1/checkpoints/best_model.pth',
@@ -334,7 +354,10 @@ def main():
         use_scheduler=config['use_scheduler'],
         use_grad_clip=config['use_grad_clip'],
         max_grad_norm=config['max_grad_norm'],
-        config=config  # Pass full config for checkpoint
+        config=config,  # Pass full config for checkpoint
+        mask_ratio=config.get('mask_ratio', 0.15),
+        mask_value=config.get('mask_value', 'zero'),
+        mask_mode=config.get('mask_mode', 'temporal')
     )
     
     # Step 6: Training loop

@@ -87,4 +87,5 @@ checkpoints/
 phase1/__pycache__
 phase2/__pycache__
 data/__pycache__
+data/visualize_smd_machine_1_1.py
 modules/__pycache__

@@ -27,6 +27,7 @@ from data.dataloader import (
     psm_sub_ds_processing
 )
 from modules.augmentation import Augmentation
+from modules.random_masking import InferenceMasking
 from phase2.agf_tcn import Agf_TCN
 from utils.point_adjustment import evaluate_with_pa
 from phase2.visualize import visualize_inference_results
@@ -204,6 +205,17 @@ class Phase2Inference:
         self.agf_tcn.eval()
         print(f"  ✓ AGF-TCN loaded")
         
+        # Initialize inference masking
+        self.inference_masking = InferenceMasking(
+            mask_ratio=self.config.get('mask_ratio', 0.15),
+            mask_value=self.config.get('mask_value', 'zero'),
+            mask_mode=self.config.get('mask_mode', 'temporal')
+        ).to(device)
+        print(f"  ✓ Inference masking initialized")
+        print(f"    Mask ratio: {self.config.get('mask_ratio', 0.15)}")
+        print(f"    Mask value: {self.config.get('mask_value', 'zero')}")
+        print(f"    Mask mode: {self.config.get('mask_mode', 'temporal')}")
+        
         # Print checkpoint info
         if 'metrics' in checkpoint:
             metrics = checkpoint['metrics']
@@ -213,16 +225,34 @@ class Phase2Inference:
     def predict(self, test_loader, stride=None, labels=None, save_visualization_data=False):
 
         print("\n🔮 Running inference...")
+        print("  Applying inference masking:")
+        print("    - Window 0: Random time masking")
+        print("    - Window 1 to last: Only mask last time-step")
+        
         all_timestep_scores = []
         all_original_data = []
         all_augmented_data = []
         all_reconstructed_data = []
         
+        # Reset window index for masking
+        self.inference_masking.reset()
+        global_window_idx = 0
+        
         with torch.no_grad():
             for batch_data, _ in tqdm(test_loader, desc="Computing anomaly scores"):
                 batch_data = batch_data.to(self.device)
+                batch_size = batch_data.shape[0]
                 
-                augmented_data = self.augmentation(batch_data)
+                # Apply inference masking with window index tracking
+                masked_data = batch_data.clone()
+                for i in range(batch_size):
+                    window_data = batch_data[i:i+1]  # (1, channels, seq_len)
+                    masked_window = self.inference_masking(window_data, window_idx=global_window_idx)
+                    masked_data[i] = masked_window[0]
+                    global_window_idx += 1
+                
+                # Apply augmentation to masked data
+                augmented_data = self.augmentation(masked_data)
                 reconstructed = self.agf_tcn(augmented_data)
                 timestep_losses = torch.mean((reconstructed - augmented_data) ** 2, dim=1)
                 

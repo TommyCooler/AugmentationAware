@@ -17,6 +17,7 @@ from data.dataloader import (
     psm_sub_ds_processing
 )
 from modules.augmentation import Augmentation
+from modules.random_masking import RandomTimeMasking
 from phase1.encoder import MLPEncoder, CNNEncoder
 from pytorch_metric_learning import losses
 
@@ -73,11 +74,21 @@ class Phase1Trainer:
         use_scheduler: bool = True,
         use_grad_clip: bool = True,
         max_grad_norm: float = 1.0,
-        config: dict = None  # Store config for inference
+        config: dict = None,  # Store config for inference
+        mask_ratio: float = 0.15,  # Random time masking ratio
+        mask_value: str = 'zero',  # 'zero', 'mean', or 'noise'
+        mask_mode: str = 'temporal'  # 'temporal' or 'channel_wise'
     ):
         self.encoder = encoder.to(device)
         self.augmentation = augmentation.to(device)
         self.device = device
+        
+        # Initialize random time masking
+        self.time_masking = RandomTimeMasking(
+            mask_ratio=mask_ratio,
+            mask_value=mask_value,
+            mask_mode=mask_mode
+        ).to(device)
         self.use_scheduler = use_scheduler
         self.use_grad_clip = use_grad_clip
         self.max_grad_norm = max_grad_norm
@@ -106,6 +117,7 @@ class Phase1Trainer:
         """Train for one epoch"""
         self.encoder.train()
         self.augmentation.train()
+        self.time_masking.train()
         
         total_loss = 0
         num_batches = 0
@@ -116,8 +128,11 @@ class Phase1Trainer:
             batch_windows = batch_windows.to(self.device)
             batch_size = batch_windows.shape[0]
             
+            # Apply random time masking before augmentation
+            masked_windows = self.time_masking(batch_windows)
+            
             # Apply augmentation to create positive pairs
-            augmented_windows = self.augmentation(batch_windows)
+            augmented_windows = self.augmentation(masked_windows)
             
             # Encode both original and augmented
             z_original = self.encoder(batch_windows)      # (batch, proj_dim)
@@ -240,6 +255,11 @@ def main():
         'use_grad_clip': False,  # Use gradient clipping
         'max_grad_norm': 1.0,   # Max gradient norm for clipping
         
+        # Random time masking options
+        'mask_ratio': 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
+        'mask_value': 'zero',  # 'zero', 'mean', or 'noise'
+        'mask_mode': 'temporal',  # 'temporal' or 'channel_wise'
+        
     }
     
     print("=" * 60)
@@ -250,9 +270,9 @@ def main():
     # Example: UCR datasets 135-138
     datasets_info = [
         {'name': 'ucr', 'subset': '135', 'loader': 'ucr'},
-        # {'name': 'ucr', 'subset': '136', 'loader': 'ucr'},
-        # {'name': 'ucr', 'subset': '137', 'loader': 'ucr'},
-        # {'name': 'ucr', 'subset': '138', 'loader': 'ucr'},
+        {'name': 'ucr', 'subset': '136', 'loader': 'ucr'},
+        {'name': 'ucr', 'subset': '137', 'loader': 'ucr'},
+        {'name': 'ucr', 'subset': '138', 'loader': 'ucr'},
     ]
     
     # Dataloader function mapping
@@ -350,7 +370,10 @@ def main():
         use_scheduler=config['use_scheduler'],
         use_grad_clip=config['use_grad_clip'],
         max_grad_norm=config['max_grad_norm'],
-        config=config  # Pass full config for checkpoint
+        config=config,  # Pass full config for checkpoint
+        mask_ratio=config.get('mask_ratio', 0.15),
+        mask_value=config.get('mask_value', 'zero'),
+        mask_mode=config.get('mask_mode', 'temporal')
     )
     
     # Train
