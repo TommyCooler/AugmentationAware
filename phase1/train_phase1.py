@@ -142,7 +142,7 @@ class Phase1Trainer:
         avg_loss = total_loss / num_batches
         return avg_loss
 
-    def train(self, dataloader, num_epochs, save_dir="checkpoints"):
+    def train(self, dataloader, num_epochs, save_dir="checkpoints", checkpoint_filename="best_model.pth"):
         """Full training loop"""
         os.makedirs(save_dir, exist_ok=True)
 
@@ -160,9 +160,8 @@ class Phase1Trainer:
             # Save checkpoint only when loss improves
             if avg_loss < best_loss:
                 best_loss = avg_loss
-                self.save_checkpoint(
-                    os.path.join(save_dir, "best_model.pth"), epoch, avg_loss
-                )
+                checkpoint_path = os.path.join(save_dir, checkpoint_filename)
+                self.save_checkpoint(checkpoint_path, epoch, avg_loss)
                 print(f"✓ Saved best model with loss: {best_loss:.4f}")
 
     def save_checkpoint(self, path, epoch, loss):
@@ -274,6 +273,17 @@ def main():
     for ds_name, n_windows in zip(stats["datasets"], stats["n_windows_per_dataset"]):
         print(f"  - {ds_name}: {n_windows} windows")
 
+    # Generate checkpoint filename from datasets
+    dataset_names = []
+    for ds_info in datasets_info:
+        if ds_info.get('subset'):
+            dataset_names.append(f"{ds_info['name']}{ds_info['subset']}")
+        else:
+            dataset_names.append(ds_info['name'])
+    checkpoint_name = "_".join(dataset_names)
+    checkpoint_filename = f"{checkpoint_name}_best_model.pth"
+    print(f"\n  Checkpoint filename: {checkpoint_filename}")
+
     # Get data dimensions
     n_channels = all_train_windows.shape[1]
     window_size = all_train_windows.shape[2]
@@ -338,7 +348,10 @@ def main():
 
     # Train
     trainer.train(
-        dataloader=dataloader, num_epochs=config["num_epochs"], save_dir="checkpoints"
+        dataloader=dataloader, 
+        num_epochs=config["num_epochs"], 
+        save_dir="checkpoints",
+        checkpoint_filename=checkpoint_filename
     )
 
     print("\n" + "=" * 60)
