@@ -55,9 +55,6 @@ def ecg_sub_ds_processing(data_path, filename, normalized=True):
         train_data = (train_data - f_min) / (f_max - f_min)
         test_data = (test_data - f_min) / (f_max - f_min)
 
-    print(type(train_data), type(test_data), type(test_label))
-    breakpoint()
-
     return train_data, test_data, test_label
 
 

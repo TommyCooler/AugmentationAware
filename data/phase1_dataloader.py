@@ -47,7 +47,14 @@ def prepare_phase1_data(
         loader_name = ds_info['loader']
         
         # Load data using appropriate loader
-        data_path = os.path.join(data_path_base, dataset_name, "labeled")
+        # Different datasets have different path structures
+        if loader_name == "gesture":
+            # Gesture uses train/ and test/ directly, not labeled/
+            data_path = os.path.join(data_path_base, dataset_name)
+        else:
+            # Other datasets use labeled/ subdirectory
+            data_path = os.path.join(data_path_base, dataset_name, "labeled")
+        
         loader_func = dataloader_func[loader_name]
         
         # Load train data (không cần test labels trong phase 1)

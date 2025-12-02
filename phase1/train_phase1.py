@@ -14,6 +14,9 @@ from data.dataloader import (
     smd_sub_ds_processing,
     smap_msl_sub_ds_processing,
     psm_sub_ds_processing,
+    pd_sub_ds_processing,
+    ecg_sub_ds_processing,
+    gesture_sub_ds_processing,
 )
 from modules.augmentation import Augmentation
 from modules.random_masking import RandomTimeMasking
@@ -229,12 +232,15 @@ def main():
     print("=" * 60)
 
     # Step 1: Prepare datasets configuration
-    # Example: UCR datasets 135-138
+    # Example: UCR datasets 135-138, PD, ECG, Gesture
     datasets_info = [
         {"name": "ucr", "subset": "135", "loader": "ucr"},
         {"name": "ucr", "subset": "136", "loader": "ucr"},
         {"name": "ucr", "subset": "137", "loader": "ucr"},
         {"name": "ucr", "subset": "138", "loader": "ucr"},
+        {"name": "pd", "subset": None, "loader": "pd"},
+        {"name": "ecg", "subset": None, "loader": "ecg"},
+        {"name": "gesture", "subset": None, "loader": "gesture"},
     ]
 
     # Dataloader function mapping
@@ -243,6 +249,9 @@ def main():
         "smd": smd_sub_ds_processing,
         "smap_msl": smap_msl_sub_ds_processing,
         "psm": psm_sub_ds_processing,
+        "pd": pd_sub_ds_processing,
+        "ecg": ecg_sub_ds_processing,
+        "gesture": gesture_sub_ds_processing,
     }
 
     # Step 2: Load and prepare data
