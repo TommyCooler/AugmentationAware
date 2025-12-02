@@ -198,10 +198,10 @@ def main():
         "dataset_name": "ucr",
         "subset": "135",  # Specific dataset: 135, 136, 137, or 138
         # Model config
-        "agf_tcn_channels": [64, 64],  # TCN hidden channels
+        "agf_tcn_channels": [256],  # TCN hidden channels
         "dropout": 0.1,
         "activation": "gelu",
-        "fuse_type": 1,
+        "fuse_type": 2,
         # Training config
         "batch_size": 64,
         "num_epochs": 50,

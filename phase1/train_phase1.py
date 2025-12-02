@@ -217,8 +217,8 @@ def main():
         "aug_hard_gumbel_softmax": False,
         # Encoder module
         "encoder_type": "mlp",
-        "hidden_dims_mlp": [64],
-        "projection_dim": 64,
+        "hidden_dims_mlp": [256],
+        "projection_dim": 256,
         "dropout_mlp": 0.1,
         "use_scheduler": False,  # Use learning rate scheduler
         "use_grad_clip": False,  # Use gradient clipping
