@@ -16,7 +16,7 @@ from tqdm import tqdm
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data.phase2_dataloader import prepare_phase2_data, Phase2Dataset
+from data.phase2_dataloader import prepare_phase2_data, Phase2TrainDataset
 from data.dataloader import (
     ucr_sub_ds_processing,
     smd_sub_ds_processing,
@@ -92,14 +92,11 @@ class Phase2Trainer:
     def _freeze_augmentation(self):
         """Freeze all parameters in augmentation module"""
         frozen_count = 0
-        trainable_count = 0
 
         for param in self.augmentation.parameters():
             if param.requires_grad:
                 param.requires_grad = False
                 frozen_count += 1
-            else:
-                trainable_count += 1
 
         self.augmentation.eval()  # Set to eval mode
 
@@ -131,9 +128,7 @@ class Phase2Trainer:
         total_loss = 0.0
 
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
-        for batch_idx, (batch_data, _) in enumerate(
-            pbar
-        ):  # Labels not used in reconstruction training
+        for batch_idx, batch_data in enumerate(pbar):
             batch_data = batch_data.to(self.device)
 
             # Apply random time masking before augmentation
@@ -196,19 +191,6 @@ class Phase2Trainer:
         torch.save(checkpoint, path)
         print(f"  ✓ Checkpoint saved with config: {path}")
 
-    def load_checkpoint(self, path):
-        """Load model checkpoint"""
-        checkpoint = torch.load(path, map_location=self.device)
-        self.agf_tcn.load_state_dict(checkpoint["agf_tcn_state_dict"])
-        self.augmentation.load_state_dict(checkpoint["augmentation_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-        if self.scheduler is not None and "scheduler_state_dict" in checkpoint:
-            self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        print(f"  Checkpoint loaded from {path}")
-        return checkpoint.get("epoch", 0), checkpoint.get("metrics", {})
-
-
 def main():
     # Configuration
     config = {
@@ -222,9 +204,6 @@ def main():
         "dropout": 0.1,
         "activation": "gelu",
         "fuse_type": 5,  # TripConFusion
-        # Augmentation Transformer hyperparameters (must match Phase 1)
-        "aug_transformer_d_model": 128,  # Transformer hidden dimension
-        "aug_transformer_nhead": 2,  # Number of attention heads (must be even)
         # Training config
         "batch_size": 64,
         "num_epochs": 50,
@@ -264,7 +243,7 @@ def main():
     loader_func = dataloader_func[config["dataset_name"]]
 
     # Load data (chỉ dùng train, test data cho inference)
-    train_windows, train_labels, _, _, _ = prepare_phase2_data(
+    train_windows, _, _, _, _ = prepare_phase2_data(
         dataset_name=config["dataset_name"],
         subset=config["subset"],
         loader_func=loader_func,
@@ -275,7 +254,8 @@ def main():
 
     # Step 2: Create train dataloader only
     print("\n[2/6] Creating train dataloader...")
-    train_dataset = Phase2Dataset(train_windows, train_labels)
+    # Training data is all normal, labels not needed for reconstruction task
+    train_dataset = Phase2TrainDataset(train_windows)
     train_loader = DataLoader(
         train_dataset,
         batch_size=config["batch_size"],
@@ -295,27 +275,43 @@ def main():
 
     # Step 3: Initialize Augmentation (load from Phase 1)
     print("\n[3/6] Loading pre-trained Augmentation from Phase 1...")
+    # Load Phase 1 checkpoint (required)
+    phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
+    
+    if not os.path.exists(phase1_checkpoint_path):
+        raise FileNotFoundError(
+            f"Phase 1 checkpoint not found at {phase1_checkpoint_path}\n"
+            f"Please train Phase 1 first or update 'phase1_checkpoint' path in config."
+        )
+    
+    phase1_checkpoint = torch.load(phase1_checkpoint_path, map_location=config["device"])
+    phase1_config = phase1_checkpoint["config"]
+    
+    # Copy augmentation config from Phase 1 to Phase 2 config (for saving checkpoint)
+    config["aug_kernel_size_cnn"] = phase1_config["aug_kernel_size_cnn"]
+    config["aug_num_layers"] = phase1_config["aug_num_layers"]
+    config["aug_dropout"] = phase1_config["aug_dropout"]
+    config["aug_temperature"] = phase1_config["aug_temperature"]
+    config["aug_hard_gumbel_softmax"] = phase1_config["aug_hard_gumbel_softmax"]
+    config["aug_transformer_d_model"] = phase1_config["aug_transformer_d_model"]
+    config["aug_transformer_nhead"] = phase1_config["aug_transformer_nhead"]
+    
+    # Initialize augmentation with Phase 1 config
     augmentation = Augmentation(
         in_channels=n_channels,
         seq_len=window_size,
-        kernel_size=3,
-        num_layers=2,
-        dropout=0.1,
-        temperature=1.0,
-        hard=False,
-        transformer_d_model=config["aug_transformer_d_model"],
-        transformer_nhead=config["aug_transformer_nhead"],
+        kernel_size=phase1_config["aug_kernel_size_cnn"],
+        num_layers=phase1_config["aug_num_layers"],
+        dropout=phase1_config["aug_dropout"],
+        temperature=phase1_config["aug_temperature"],
+        hard=phase1_config["aug_hard_gumbel_softmax"],
+        transformer_d_model=phase1_config["aug_transformer_d_model"],
+        transformer_nhead=phase1_config["aug_transformer_nhead"],
     )
 
-    # Load Phase 1 checkpoint
-    phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
-    if os.path.exists(phase1_checkpoint_path):
-        checkpoint = torch.load(phase1_checkpoint_path, map_location=config["device"])
-        augmentation.load_state_dict(checkpoint["augmentation_state_dict"])
-        print(f"  ✓ Loaded augmentation from: {phase1_checkpoint_path}")
-    else:
-        print(f"  ⚠ WARNING: Phase 1 checkpoint not found at {phase1_checkpoint_path}")
-        print(f"  ⚠ Using randomly initialized augmentation (not recommended!)")
+    # Load Phase 1 checkpoint weights
+    augmentation.load_state_dict(phase1_checkpoint["augmentation_state_dict"])
+    print(f"  ✓ Loaded augmentation from: {phase1_checkpoint_path}")
 
     # Step 4: Initialize AGF-TCN
     print("\n[4/6] Initializing AGF-TCN...")

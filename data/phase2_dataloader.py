@@ -14,6 +14,7 @@ from data.sliding_window import create_sliding_windows
 class Phase2Dataset(Dataset):
     """
     Dataset for Phase 2: Returns windows with labels
+    Used for test/inference where labels are needed
     """
     def __init__(self, data: np.ndarray, labels: np.ndarray):
         """
@@ -32,6 +33,25 @@ class Phase2Dataset(Dataset):
     
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx]
+
+
+class Phase2TrainDataset(Dataset):
+    """
+    Simple dataset for Phase 2 training: Only returns data (no labels needed)
+    Training data is all normal, so labels are not used in reconstruction task
+    """
+    def __init__(self, data: np.ndarray):
+        """
+        Args:
+            data: shape (n_samples, n_channels, seq_len)
+        """
+        self.data = torch.FloatTensor(data)
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, idx):
+        return self.data[idx]
 
 
 def prepare_phase2_data(
@@ -124,7 +144,7 @@ def create_phase2_dataloaders(
     
     Args:
         train_windows: Training windows
-        train_labels: Training labels
+        train_labels: Training labels (not used in training, but kept for compatibility)
         test_windows: Test windows
         test_labels: Test labels
         batch_size: Batch size
@@ -136,7 +156,9 @@ def create_phase2_dataloaders(
     import torch
     use_cuda = torch.cuda.is_available()
     
-    train_dataset = Phase2Dataset(train_windows, train_labels)
+    # Training doesn't need labels (all normal data)
+    train_dataset = Phase2TrainDataset(train_windows)
+    # Test needs labels for evaluation
     test_dataset = Phase2Dataset(test_windows, test_labels)
     
     train_loader = DataLoader(
@@ -184,9 +206,14 @@ if __name__ == "__main__":
         batch_size=32
     )
     
-    # Test iteration
-    for batch_data, batch_labels in train_loader:
-        print(f"\nBatch shape: {batch_data.shape}")
-        print(f"Labels shape: {batch_labels.shape}")
+    # Test iteration - train loader only returns data (no labels)
+    for batch_data in train_loader:
+        print(f"\nTrain batch shape: {batch_data.shape}")
+        break
+    
+    # Test iteration - test loader returns data and labels
+    for batch_data, batch_labels in test_loader:
+        print(f"\nTest batch shape: {batch_data.shape}")
+        print(f"Test labels shape: {batch_labels.shape}")
         break
 

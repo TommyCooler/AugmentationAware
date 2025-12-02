@@ -11,8 +11,11 @@ from .sliding_window import create_sliding_windows
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-class Phase1Dataset(Dataset):
-    
+class Phase1TrainDataset(Dataset):
+    """
+    Simple dataset for Phase 1 training: Only returns windows (no labels needed)
+    Training data is all normal, used for contrastive learning
+    """
     def __init__(self, all_windows: np.ndarray):
         self.windows = torch.from_numpy(all_windows).float()
         
@@ -87,7 +90,7 @@ def create_phase1_dataloader(
     shuffle: bool = True
 ) -> DataLoader:
     
-    dataset = Phase1Dataset(all_train_windows)
+    dataset = Phase1TrainDataset(all_train_windows)
     
     dataloader = DataLoader(
         dataset,

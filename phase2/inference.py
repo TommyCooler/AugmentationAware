@@ -110,11 +110,8 @@ def map_window_scores_to_timeseries(
     timeseries_scores = np.full(n_time_steps, np.nan, dtype=np.float32)
 
     # Map window 0: all time steps
-    window_0_start = 0
-    window_0_end = window_size
-    # Extract per-time-step scores for window 0
     window_0_scores = timestep_scores_all_windows[0]  # Shape: (window_size,)
-    timeseries_scores[window_0_start:window_0_end] = window_0_scores
+    timeseries_scores[0:window_size] = window_0_scores
 
     # Map subsequent windows: only last time step
     for i in range(1, n_windows):
@@ -175,12 +172,11 @@ class Phase2Inference:
         self.augmentation = Augmentation(
             in_channels=self.config["n_channels"],
             seq_len=self.config["window_size"],
-            out_channels=self.config["n_channels"],
-            kernel_size=self.config["aug_kernel_size_cnn"],
+            kernel_size=self.config["aug_kernel_size_cnn"],  
             num_layers=self.config["aug_num_layers"],
             dropout=self.config["aug_dropout"],
             temperature=self.config["aug_temperature"],
-            hard=self.config["aug_hard_gumbel_softmax"],
+            hard=self.config["aug_hard_gumbel_softmax"],    
             transformer_d_model=self.config["aug_transformer_d_model"],
             transformer_nhead=self.config["aug_transformer_nhead"],
         )
@@ -205,20 +201,16 @@ class Phase2Inference:
 
         # Initialize inference masking
         self.inference_masking = InferenceMasking(
-            mask_ratio=self.config.get("mask_ratio", 0.15),
-            mask_value=self.config.get("mask_value", "zero"),
-            mask_mode=self.config.get("mask_mode", "temporal"),
+            mask_ratio=self.config["mask_ratio"],
         ).to(device)
         print(f"  ✓ Inference masking initialized")
-        print(f"    Mask ratio: {self.config.get('mask_ratio', 0.15)}")
-        print(f"    Mask value: {self.config.get('mask_value', 'zero')}")
-        print(f"    Mask mode: {self.config.get('mask_mode', 'temporal')}")
+        print(f"    Mask ratio: {self.config['mask_ratio']}")
 
         # Print checkpoint info
         if "metrics" in checkpoint:
             metrics = checkpoint["metrics"]
             print(f"\n📊 Checkpoint metrics (from training):")
-            print(f"  Train Loss: {metrics.get('train_loss', 'N/A'):.6f}")
+            print(f"  Train Loss: {metrics['train_loss']:.6f}")
 
     def predict(
         self, test_loader, stride=None, labels=None, save_visualization_data=False
@@ -276,7 +268,7 @@ class Phase2Inference:
             f"   Each window has {timestep_scores_all_windows.shape[1]} time-step scores"
         )
 
-        stride = stride if stride is not None else self.config.get("stride", 1)
+        stride = stride if stride is not None else self.config["stride"]
         window_size = self.config["window_size"]
 
         print(f"\n🔄 Mapping window scores to time series...")
@@ -339,11 +331,11 @@ class Phase2Inference:
             print(f"\n🎯 Best Threshold Search:")
             print(f"  Best Threshold: {metrics['best_threshold']:.6f}")
             print(f"  Best F1-Score: {metrics['best_f1']:.4f}")
-            print(f"  Best Precision: {metrics.get('best_precision', 0):.4f}")
-            print(f"  Best Recall: {metrics.get('best_recall', 0):.4f}")
-            print(f"  Best Accuracy: {metrics.get('best_accuracy', 0):.4f}")
+            print(f"  Best Precision: {metrics['best_precision']:.4f}")
+            print(f"  Best Recall: {metrics['best_recall']:.4f}")
+            print(f"  Best Accuracy: {metrics['best_accuracy']:.4f}")
         else:
-            print(f"\n🎯 Results (threshold={metrics.get('threshold', 'N/A'):.6f}):")
+            print(f"\n🎯 Results (threshold={metrics['threshold']:.6f}):")
             print(f"  F1-Score: {metrics['f1']:.4f}")
             print(f"  Precision: {metrics['precision']:.4f}")
             print(f"  Recall: {metrics['recall']:.4f}")
@@ -416,7 +408,7 @@ def main():
     # Override dataset if provided
     dataset_name = args.dataset if args.dataset else config["dataset_name"]
     subset = args.subset if args.subset else config["subset"]
-    batch_size = args.batch_size if args.batch_size else config.get("batch_size", 32)
+    batch_size = args.batch_size if args.batch_size else config["batch_size"]
 
     print(f"\n[1/3] Loading test data: {dataset_name}_{subset}")
     print(f"  Batch size: {batch_size}")
@@ -439,7 +431,7 @@ def main():
         subset=subset,
         loader_func=loader_func,
         window_size=config["window_size"],
-        stride=config.get("stride", 1),
+        stride=config["stride"],
         data_path_base=data_path_base,
     )
 
@@ -459,7 +451,7 @@ def main():
     print("\n[3/3] Running inference...")
     metrics, anomaly_scores, labels, visualization_data = inferencer.predict(
         test_loader,
-        stride=config.get("stride", 1),
+        stride=config["stride"],
         labels=labels,
         save_visualization_data=not args.no_viz,
     )
@@ -470,8 +462,11 @@ def main():
     # Visualization
     if visualization_data is not None:
         print("\n📊 Generating visualization...")
-        threshold = metrics.get("best_threshold", metrics.get("threshold"))
-        predictions = metrics.get("predictions")
+        try:
+            threshold = metrics["best_threshold"]
+        except KeyError:
+            threshold = metrics["threshold"]
+        predictions = metrics["predictions"]
 
         viz_output_dir = os.path.join(project_root, "results", "visualizations")
         os.makedirs(viz_output_dir, exist_ok=True)
