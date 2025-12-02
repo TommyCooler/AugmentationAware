@@ -197,13 +197,11 @@ def main():
         # Data config
         "dataset_name": "ucr",
         "subset": "135",  # Specific dataset: 135, 136, 137, or 138
-        "window_size": 16,
-        "stride": 1,
         # Model config
         "agf_tcn_channels": [64, 64],  # TCN hidden channels
         "dropout": 0.1,
         "activation": "gelu",
-        "fuse_type": 5,  # TripConFusion
+        "fuse_type": 1,
         # Training config
         "batch_size": 64,
         "num_epochs": 50,
@@ -226,11 +224,29 @@ def main():
     print("Phase 2: Supervised Anomaly Detection Training")
     print("=" * 60)
 
-    # Step 1: Prepare data
-    print(f"\n[1/6] Loading dataset: {config['dataset_name']}_{config['subset']}")
-
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_path_base = os.path.join(project_root, "data", "datasets")
+
+    # Step 1: Load Phase 1 checkpoint to get window_size and stride
+    print("\n[1/6] Loading Phase 1 checkpoint for window_size and stride...")
+    phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
+    
+    if not os.path.exists(phase1_checkpoint_path):
+        raise FileNotFoundError(
+            f"Phase 1 checkpoint not found at {phase1_checkpoint_path}\n"
+            f"Please train Phase 1 first or update 'phase1_checkpoint' path in config."
+        )
+    
+    phase1_checkpoint = torch.load(phase1_checkpoint_path, map_location=config["device"])
+    phase1_config = phase1_checkpoint["config"]
+    
+    # Get window_size and stride from Phase 1
+    config["window_size"] = phase1_config["window_size"]
+    config["stride"] = phase1_config["stride"]
+    print(f"  ✓ Loaded window_size: {config['window_size']}, stride: {config['stride']} from Phase 1")
+
+    # Step 2: Prepare data
+    print(f"\n[2/6] Loading dataset: {config['dataset_name']}_{config['subset']}")
 
     # Dataloader function mapping
     dataloader_func = {
@@ -252,8 +268,8 @@ def main():
         data_path_base=data_path_base,
     )
 
-    # Step 2: Create train dataloader only
-    print("\n[2/6] Creating train dataloader...")
+    # Step 3: Create train dataloader only
+    print("\n[3/6] Creating train dataloader...")
     # Training data is all normal, labels not needed for reconstruction task
     train_dataset = Phase2TrainDataset(train_windows)
     train_loader = DataLoader(
@@ -273,19 +289,9 @@ def main():
     config["n_channels"] = n_channels
     config["window_size"] = window_size
 
-    # Step 3: Initialize Augmentation (load from Phase 1)
-    print("\n[3/6] Loading pre-trained Augmentation from Phase 1...")
-    # Load Phase 1 checkpoint (required)
-    phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
-    
-    if not os.path.exists(phase1_checkpoint_path):
-        raise FileNotFoundError(
-            f"Phase 1 checkpoint not found at {phase1_checkpoint_path}\n"
-            f"Please train Phase 1 first or update 'phase1_checkpoint' path in config."
-        )
-    
-    phase1_checkpoint = torch.load(phase1_checkpoint_path, map_location=config["device"])
-    phase1_config = phase1_checkpoint["config"]
+    # Step 4: Initialize Augmentation (load from Phase 1)
+    print("\n[4/6] Loading pre-trained Augmentation from Phase 1...")
+    # Phase 1 checkpoint already loaded above
     
     # Copy augmentation config from Phase 1 to Phase 2 config (for saving checkpoint)
     config["aug_kernel_size_cnn"] = phase1_config["aug_kernel_size_cnn"]
@@ -313,8 +319,8 @@ def main():
     augmentation.load_state_dict(phase1_checkpoint["augmentation_state_dict"])
     print(f"  ✓ Loaded augmentation from: {phase1_checkpoint_path}")
 
-    # Step 4: Initialize AGF-TCN
-    print("\n[4/6] Initializing AGF-TCN...")
+    # Step 5: Initialize AGF-TCN
+    print("\n[5/6] Initializing AGF-TCN...")
     agf_tcn = Agf_TCN(
         num_inputs=n_channels,
         num_channels=config["agf_tcn_channels"],
@@ -327,8 +333,8 @@ def main():
     print(f"  Input shape: ({n_channels}, {window_size})")
     print(f"  Output shape: ({n_channels}, {window_size})")
 
-    # Step 5: Initialize trainer
-    print("\n[5/6] Initializing trainer...")
+    # Step 6: Initialize trainer
+    print("\n[6/6] Initializing trainer...")
     trainer = Phase2Trainer(
         augmentation=augmentation,
         agf_tcn=agf_tcn,
@@ -342,8 +348,8 @@ def main():
         mask_ratio=config["mask_ratio"],
     )
 
-    # Step 6: Training loop
-    print("\n[6/6] Starting training...")
+    # Step 7: Training loop
+    print("\n[7/7] Starting training...")
     print(f"  Epochs: {config['num_epochs']}")
     print(f"  Device: {config['device']}")
 

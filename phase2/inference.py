@@ -30,55 +30,6 @@ from modules.augmentation import Augmentation
 from modules.random_masking import InferenceMasking
 from phase2.agf_tcn import Agf_TCN
 from utils.point_adjustment import evaluate_with_pa
-from phase2.visualize import visualize_inference_results
-
-
-def map_window_data_to_timeseries(
-    window_data_all: np.ndarray, n_time_steps: int, window_size: int, stride: int
-) -> np.ndarray:
-    """
-    Map window-level data back to time series
-
-    Args:
-        window_data_all: shape (n_windows, n_channels, window_size) - data for all windows
-        n_time_steps: Total number of time steps in original time series
-        window_size: Size of each window
-        stride: Stride between windows
-
-    Returns:
-        timeseries_data: shape (n_channels, n_time_steps)
-    """
-    n_windows, n_channels, _ = window_data_all.shape
-    timeseries_data = np.full((n_channels, n_time_steps), np.nan, dtype=np.float32)
-
-    # Window 0: Map all time steps
-    window_0_data = window_data_all[0]  # (n_channels, window_size)
-    timeseries_data[:, :window_size] = window_0_data
-
-    # Subsequent windows: Only map last time step
-    for i in range(1, n_windows):
-        start_idx = i * stride
-        last_time_step_idx = start_idx + window_size - 1
-
-        if last_time_step_idx < n_time_steps:
-            last_timestep_data = window_data_all[i, :, -1]  # (n_channels,)
-
-            # Map data (no overlap because we only take the last time-step)
-            timeseries_data[:, last_time_step_idx] = last_timestep_data
-
-    # Forward fill NaN values
-    for ch in range(n_channels):
-        mask = ~np.isnan(timeseries_data[ch])
-        if np.any(mask):
-            timeseries_data[ch] = np.interp(
-                np.arange(n_time_steps),
-                np.arange(n_time_steps)[mask],
-                timeseries_data[ch][mask],
-            )
-        else:
-            timeseries_data[ch] = 0.0
-
-    return timeseries_data
 
 
 def map_window_scores_to_timeseries(
@@ -213,7 +164,7 @@ class Phase2Inference:
             print(f"  Train Loss: {metrics['train_loss']:.6f}")
 
     def predict(
-        self, test_loader, stride=None, labels=None, save_visualization_data=False
+        self, test_loader, stride=None, labels=None
     ):
 
         print("\n🔮 Running inference...")
@@ -222,9 +173,6 @@ class Phase2Inference:
         print("    - Window 1 to last: Only mask last time-step")
 
         all_timestep_scores = []
-        all_original_data = []
-        all_augmented_data = []
-        all_reconstructed_data = []
 
         # Reset window index for masking
         self.inference_masking.reset()
@@ -253,11 +201,6 @@ class Phase2Inference:
                 )
 
                 all_timestep_scores.append(timestep_losses.cpu().numpy())
-
-                if save_visualization_data:
-                    all_original_data.append(batch_data.cpu().numpy())
-                    all_augmented_data.append(augmented_data.cpu().numpy())
-                    all_reconstructed_data.append(reconstructed.cpu().numpy())
 
         timestep_scores_all_windows = np.concatenate(all_timestep_scores, axis=0)
 
@@ -294,32 +237,7 @@ class Phase2Inference:
 
         metrics = evaluate_with_pa(anomaly_scores=anomaly_scores, labels=labels)
 
-        # Map visualization data to time series if requested
-        visualization_data = None
-        if save_visualization_data:
-            print(f"\n📊 Preparing visualization data...")
-            original_windows = np.concatenate(all_original_data, axis=0)
-            augmented_windows = np.concatenate(all_augmented_data, axis=0)
-            reconstructed_windows = np.concatenate(all_reconstructed_data, axis=0)
-
-            original_timeseries = map_window_data_to_timeseries(
-                original_windows, len(labels), window_size, stride
-            )
-            augmented_timeseries = map_window_data_to_timeseries(
-                augmented_windows, len(labels), window_size, stride
-            )
-            reconstructed_timeseries = map_window_data_to_timeseries(
-                reconstructed_windows, len(labels), window_size, stride
-            )
-
-            visualization_data = {
-                "original": original_timeseries,
-                "augmented": augmented_timeseries,
-                "reconstructed": reconstructed_timeseries,
-            }
-            print(f"  ✓ Visualization data prepared")
-
-        return metrics, anomaly_scores, labels, visualization_data
+        return metrics, anomaly_scores, labels
 
     def print_results(self, metrics):
         """In kết quả inference"""
@@ -381,7 +299,6 @@ def main():
         default=None,
         help="Batch size for inference (optional, will use from checkpoint if not provided)",
     )
-    parser.add_argument("--no_viz", action="store_true", help="Disable visualization")
     parser.add_argument(
         "--device",
         type=str,
@@ -449,39 +366,14 @@ def main():
 
     # Run inference
     print("\n[3/3] Running inference...")
-    metrics, anomaly_scores, labels, visualization_data = inferencer.predict(
+    metrics, anomaly_scores, labels = inferencer.predict(
         test_loader,
         stride=config["stride"],
         labels=labels,
-        save_visualization_data=not args.no_viz,
     )
 
     # Print results
     inferencer.print_results(metrics)
-
-    # Visualization
-    if visualization_data is not None:
-        print("\n📊 Generating visualization...")
-        try:
-            threshold = metrics["best_threshold"]
-        except KeyError:
-            threshold = metrics["threshold"]
-        predictions = metrics["predictions"]
-
-        viz_output_dir = os.path.join(project_root, "results", "visualizations")
-        os.makedirs(viz_output_dir, exist_ok=True)
-        viz_save_path = os.path.join(viz_output_dir, f"viz_{dataset_name}_{subset}.png")
-
-        visualize_inference_results(
-            original_data=visualization_data["original"],
-            augmented_data=visualization_data["augmented"],
-            reconstructed_data=visualization_data["reconstructed"],
-            anomaly_scores=anomaly_scores,
-            labels=labels,
-            predictions=predictions,
-            threshold=threshold,
-            save_path=viz_save_path,
-        )
 
     # Save results (optional)
     output_dir = os.path.join(project_root, "results")

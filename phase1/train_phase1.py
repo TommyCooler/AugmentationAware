@@ -205,7 +205,6 @@ def main():
         "num_epochs": 1000,
         "learning_rate": 1e-4,
         "temperature": 0.07,
-        "projection_dim": 256,
         # Augmentation module
         "aug_transformer_d_model": 128,
         "aug_transformer_nhead": 2,
@@ -216,7 +215,8 @@ def main():
         "aug_hard_gumbel_softmax": False,
         # Encoder module
         "encoder_type": "mlp",
-        "hidden_dims_mlp": [256],
+        "hidden_dims_mlp": [64],
+        "projection_dim": 64,
         "dropout_mlp": 0.1,
         "use_scheduler": False,  # Use learning rate scheduler
         "use_grad_clip": False,  # Use gradient clipping
