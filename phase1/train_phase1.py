@@ -230,16 +230,19 @@ def main():
     print("Phase 1: Contrastive Learning Training")
     print("=" * 60)
 
-    # Step 1: Prepare datasets configuration
-    # Example: UCR datasets 135-138, PD, ECG, Gesture
     datasets_info = [
-        {"name": "ucr", "subset": "135", "loader": "ucr"},
-        {"name": "ucr", "subset": "136", "loader": "ucr"},
-        {"name": "ucr", "subset": "137", "loader": "ucr"},
-        {"name": "ucr", "subset": "138", "loader": "ucr"},
-        {"name": "pd", "subset": None, "loader": "pd"},
-        {"name": "ecg", "subset": None, "loader": "ecg"},
-        {"name": "gesture", "subset": None, "loader": "gesture"},
+        # {"name": "ucr", "subset": "135", "loader": "ucr"},
+        # {"name": "ucr", "subset": "136", "loader": "ucr"},
+        # {"name": "ucr", "subset": "137", "loader": "ucr"},
+        # {"name": "ucr", "subset": "138", "loader": "ucr"},
+        # {"name": "pd", "subset": None, "loader": "pd"},
+        # {"name": "gesture", "subset": None, "loader": "gesture"},
+        {"name": "ecg", "subset": "chfdb_chf01_275.pkl", "loader": "ecg"},
+        {"name": "ecg", "subset": "chfdb_chf13_45590.pkl", "loader": "ecg"},
+        {"name": "ecg", "subset": "chfdbchf15.pkl", "loader": "ecg"},
+        {"name": "ecg", "subset": "ltstdb_20221_43.pkl", "loader": "ecg"},
+        {"name": "ecg", "subset": "ltstdb_20321_240.pkl", "loader": "ecg"},
+        {"name": "ecg", "subset": "mitdb__100_180.pkl", "loader": "ecg"},
     ]
 
     # Dataloader function mapping

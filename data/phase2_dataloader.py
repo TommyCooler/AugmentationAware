@@ -66,8 +66,8 @@ def prepare_phase2_data(
     Load and prepare data for Phase 2 training
     
     Args:
-        dataset_name: Dataset name (e.g., 'ucr', 'smap_msl_')
-        subset: Subset name (e.g., '135', '136')
+        dataset_name: Dataset name (e.g., 'ucr', 'smap_msl_', 'ecg', 'pd', 'gesture')
+        subset: Subset name (e.g., '135', '136', 'chfdb_chf01_275.pkl', None)
         loader_func: Data loading function
         window_size: Sliding window size
         stride: Sliding window stride
@@ -81,7 +81,13 @@ def prepare_phase2_data(
         labels: (n_time_steps,) - test labels per time-step
     """
     # Load data
-    data_path = os.path.join(data_path_base, dataset_name, "labeled")
+    # Different datasets have different path structures
+    if dataset_name == "gesture":
+        # Gesture uses train/ and test/ directly, not labeled/
+        data_path = os.path.join(data_path_base, dataset_name)
+    else:
+        # Other datasets use labeled/ subdirectory
+        data_path = os.path.join(data_path_base, dataset_name, "labeled")
     train_data, test_data, labels = loader_func(
         data_path=data_path,
         filename=subset,

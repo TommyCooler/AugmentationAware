@@ -25,6 +25,9 @@ from data.dataloader import (
     smd_sub_ds_processing,
     smap_msl_sub_ds_processing,
     psm_sub_ds_processing,
+    pd_sub_ds_processing,
+    ecg_sub_ds_processing,
+    gesture_sub_ds_processing,
 )
 from modules.augmentation import Augmentation
 from modules.random_masking import InferenceMasking
@@ -339,6 +342,9 @@ def main():
         "smd": smd_sub_ds_processing,
         "smap_msl": smap_msl_sub_ds_processing,
         "psm": psm_sub_ds_processing,
+        "pd": pd_sub_ds_processing,
+        "ecg": ecg_sub_ds_processing,
+        "gesture": gesture_sub_ds_processing,
     }
 
     loader_func = dataloader_func[dataset_name]
