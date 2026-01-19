@@ -311,8 +311,8 @@ def main():
     # Configuration
     config = {
         # Data config
-        "dataset_name": "ucr",
-        "subset": "136",  # Specific dataset: 135, 136, 137, or 138
+        "dataset_name": "smd",
+        "subset": "machine-1-1",  # Specific dataset: 135, 136, 137, or 138
         # Model config
         "agf_tcn_channels": [256],  # TCN hidden channels
         "dropout": 0.1,
@@ -329,7 +329,7 @@ def main():
         # Random time masking options
         "mask_ratio": 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
         # Phase 1 checkpoint (pre-trained augmentation)
-        "phase1_checkpoint": "phase1/checkpoints/ucr_best_model.pth",
+        "phase1_checkpoint": "phase1/checkpoints/smdmachine-1-1_best_model.pth",
         # Misc
         "num_workers": 0,
         "save_dir": "phase2/checkpoints",
@@ -354,7 +354,7 @@ def main():
         )
 
     phase1_checkpoint = torch.load(
-        phase1_checkpoint_path, map_location=config["device"]
+        phase1_checkpoint_path, map_location=config["device"], weights_only=False
     )
     phase1_config = phase1_checkpoint["config"]
 
@@ -489,9 +489,9 @@ def main():
     print(f"  Device: {config['device']}")
     print(f"  Inference will run only when loss decreases")
 
-    best_loss = float("inf")
     best_f1 = 0.0
     best_epoch = 0
+    best_inference_metrics = None
 
     for epoch in range(1, config["num_epochs"] + 1):
         print(f"\n{'='*60}")
@@ -509,55 +509,65 @@ def main():
         if trainer.scheduler is not None:
             trainer.scheduler.step(train_metrics["train_loss"])
 
-        # Only run inference when loss decreases
-        if train_metrics["train_loss"] < best_loss:
-            best_loss = train_metrics["train_loss"]
+        # Run inference on test set at each epoch
+        print(f"\nRunning inference on test set...")
+        inference_metrics = trainer.evaluate(
+            test_loader=test_loader, labels=labels, stride=config["stride"]
+        )
 
-            # Run inference on test set
-            print(f"\nRunning inference on test set (loss improved)...")
-            inference_metrics = trainer.evaluate(
-                test_loader=test_loader, labels=labels, stride=config["stride"]
+        # Get F1 score
+        f1_score = inference_metrics.get("best_f1", 0.0)
+
+        # Print inference metrics
+        print(f"\nEpoch {epoch} Inference Results:")
+        print(f"  F1-Score: {f1_score:.4f}")
+        print(f"  Precision: {inference_metrics.get('best_precision', 0.0):.4f}")
+        print(f"  Recall: {inference_metrics.get('best_recall', 0.0):.4f}")
+        print(f"  Accuracy: {inference_metrics.get('best_accuracy', 0.0):.4f}")
+
+        # Combine metrics for checkpoint
+        combined_metrics = {
+            **train_metrics,
+            **{f"inference_{k}": v for k, v in inference_metrics.items()},
+        }
+
+        # Save checkpoint when F1 improves
+        if f1_score > best_f1:
+            best_f1 = f1_score
+            best_epoch = epoch
+            best_inference_metrics = inference_metrics
+
+            save_path = os.path.join(
+                project_root,
+                config["save_dir"],
+                f"phase2_{config['dataset_name']}_{config['subset']}_best.pt",
             )
-
-            # Get F1 score
-            f1_score = inference_metrics.get("best_f1", 0.0)
-
-            # Print inference metrics
-            print(f"\nEpoch {epoch} Inference Results:")
-            print(f"  F1-Score: {f1_score:.4f}")
-            print(f"  Precision: {inference_metrics.get('best_precision', 0.0):.4f}")
-            print(f"  Recall: {inference_metrics.get('best_recall', 0.0):.4f}")
-            print(f"  Accuracy: {inference_metrics.get('best_accuracy', 0.0):.4f}")
-
-            # Combine metrics for checkpoint
-            combined_metrics = {
-                **train_metrics,
-                "f1": f1_score,
-                "precision": inference_metrics.get("best_precision", 0.0),
-                "recall": inference_metrics.get("best_recall", 0.0),
-                "accuracy": inference_metrics.get("best_accuracy", 0.0),
-            }
-
-            # Save checkpoint when F1 improves
-            if f1_score > best_f1:
-                best_f1 = f1_score
-                best_epoch = epoch
-
-                save_path = os.path.join(
-                    project_root,
-                    config["save_dir"],
-                    f"phase2_{config['dataset_name']}_{config['subset']}_best.pt",
-                )
-                trainer.save_checkpoint(save_path, epoch, combined_metrics)
-                print(f"  ✓ New best model! F1-Score: {best_f1:.4f} (Epoch {epoch})")
-        else:
-            print(f"  Loss did not improve (best: {best_loss:.6f}), skipping inference")
+            trainer.save_checkpoint(save_path, epoch, combined_metrics)
+            print(f"  ✓ New best model! F1-Score: {best_f1:.4f} (Epoch {epoch})")
 
     print("\n" + "=" * 60)
     print("Training completed!")
-    print(f"Best F1-Score: {best_f1:.4f} (Epoch {best_epoch})")
+    print("=" * 60)
+    print(f"\n📊 BEST MODEL RESULTS (Epoch {best_epoch}):")
+    print(f"  F1-Score: {best_inference_metrics.get('best_f1', 0.0):.4f}")
+    print(f"  Precision: {best_inference_metrics.get('best_precision', 0.0):.4f}")
+    print(f"  Recall: {best_inference_metrics.get('best_recall', 0.0):.4f}")
+    print(f"  Accuracy: {best_inference_metrics.get('best_accuracy', 0.0):.4f}")
+    print(f"\n📈 Confusion Matrix:")
+    print(f"  TP (True Positives): {best_inference_metrics.get('best_TP', 0)}")
+    print(f"  TN (True Negatives): {best_inference_metrics.get('best_TN', 0)}")
+    print(f"  FP (False Positives): {best_inference_metrics.get('best_FP', 0)}")
+    print(f"  FN (False Negatives): {best_inference_metrics.get('best_FN', 0)}")
+    print(f"\n📍 Point Adjustment Info:")
+    print(f"  Total Segments: {best_inference_metrics.get('best_total_segments', 0)}")
     print(
-        f"Saved checkpoint: checkpoints/phase2_{config['dataset_name']}_{config['subset']}_best.pt"
+        f"  Detected Segments: {best_inference_metrics.get('best_detected_segments', 0)}"
+    )
+    print(
+        f"  Detection Rate: {best_inference_metrics.get('best_segment_detection_rate', 0.0):.4f}"
+    )
+    print(
+        f"\n💾 Saved checkpoint: checkpoints/phase2_{config['dataset_name']}_{config['subset']}_best.pt"
     )
     print("=" * 60)
 

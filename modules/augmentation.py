@@ -2,7 +2,6 @@ import torch.nn as nn
 import torch
 import math
 import torch.nn.functional as F
-from pytorch_tcn import TCN
 
 
 class LinearAugmentation(nn.Module):
