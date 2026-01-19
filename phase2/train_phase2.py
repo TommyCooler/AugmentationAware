@@ -18,7 +18,11 @@ from tqdm import tqdm
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data.phase2_dataloader import prepare_phase2_data, Phase2TrainDataset, Phase2Dataset
+from data.phase2_dataloader import (
+    prepare_phase2_data,
+    Phase2TrainDataset,
+    Phase2Dataset,
+)
 from data.dataloader import (
     ucr_sub_ds_processing,
     smd_sub_ds_processing,
@@ -137,19 +141,19 @@ class Phase2Trainer:
         for batch_idx, batch_data in enumerate(pbar):
             batch_data = batch_data.to(self.device)
 
-            # Apply random time masking before augmentation
-            masked_data = self.time_masking(batch_data)
-
             # Forward pass
             with torch.no_grad():
-                # Get augmented data (frozen augmentation)
-                augmented_data = self.augmentation(masked_data)
+                # Get augmented data (frozen augmentation) - no masking
+                target_data = self.augmentation(batch_data)
 
-            # Reconstruct from augmented data
-            reconstructed = self.agf_tcn(augmented_data)
+            # Apply random time masking after augmentation
+            masked_target = self.time_masking(target_data)
 
-            # Compute reconstruction loss
-            loss = self.criterion(reconstructed, augmented_data)
+            # Reconstruct from masked augmented data
+            reconstructed = self.agf_tcn(masked_target)
+
+            # Compute reconstruction loss between reconstruction and target (non-masked)
+            loss = self.criterion(reconstructed, target_data)
 
             # Backward pass
             self.optimizer.zero_grad()
@@ -223,11 +227,13 @@ class Phase2Trainer:
         """
         self.agf_tcn.eval()
         self.augmentation.eval()
-        
+
         # Initialize inference masking
-        inference_masking = InferenceMasking(mask_ratio=self.config.get("mask_ratio", 0.15)).to(self.device)
+        inference_masking = InferenceMasking(
+            mask_ratio=self.config.get("mask_ratio", 0.15)
+        ).to(self.device)
         inference_masking.reset()
-        
+
         all_timestep_scores = []
         global_window_idx = 0
 
@@ -236,22 +242,22 @@ class Phase2Trainer:
                 batch_data = batch_data.to(self.device)
                 batch_size = batch_data.shape[0]
 
-                # Apply inference masking with window index tracking
-                masked_data = batch_data.clone()
+                # Apply augmentation to get target (no masking)
+                target_data = self.augmentation(batch_data)
+
+                # Apply inference masking to augmented data with window index tracking
+                masked_target = target_data.clone()
                 for i in range(batch_size):
-                    window_data = batch_data[i : i + 1]
+                    window_data = target_data[i : i + 1]
                     masked_window = inference_masking(
                         window_data, window_idx=global_window_idx
                     )
-                    masked_data[i] = masked_window[0]
+                    masked_target[i] = masked_window[0]
                     global_window_idx += 1
 
-                # Apply augmentation to masked data
-                augmented_data = self.augmentation(masked_data)
-                reconstructed = self.agf_tcn(augmented_data)
-                timestep_losses = torch.mean(
-                    (reconstructed - augmented_data) ** 2, dim=1
-                )
+                # Reconstruct from masked augmented data
+                reconstructed = self.agf_tcn(masked_target)
+                timestep_losses = torch.mean((reconstructed - target_data) ** 2, dim=1)
 
                 all_timestep_scores.append(timestep_losses.cpu().numpy())
 
@@ -340,20 +346,24 @@ def main():
     # Step 1: Load Phase 1 checkpoint to get window_size and stride
     print("\n[1/6] Loading Phase 1 checkpoint for window_size and stride...")
     phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
-    
+
     if not os.path.exists(phase1_checkpoint_path):
         raise FileNotFoundError(
             f"Phase 1 checkpoint not found at {phase1_checkpoint_path}\n"
             f"Please train Phase 1 first or update 'phase1_checkpoint' path in config."
         )
-    
-    phase1_checkpoint = torch.load(phase1_checkpoint_path, map_location=config["device"])
+
+    phase1_checkpoint = torch.load(
+        phase1_checkpoint_path, map_location=config["device"]
+    )
     phase1_config = phase1_checkpoint["config"]
-    
+
     # Get window_size and stride from Phase 1
     config["window_size"] = phase1_config["window_size"]
     config["stride"] = phase1_config["stride"]
-    print(f"  ✓ Loaded window_size: {config['window_size']}, stride: {config['stride']} from Phase 1")
+    print(
+        f"  ✓ Loaded window_size: {config['window_size']}, stride: {config['stride']} from Phase 1"
+    )
 
     # Step 2: Prepare data
     print(f"\n[2/6] Loading dataset: {config['dataset_name']}_{config['subset']}")
@@ -393,7 +403,7 @@ def main():
         drop_last=True,
     )
     print(f"  Train batches: {len(train_loader)}")
-    
+
     # Test dataset for inference
     test_dataset = Phase2Dataset(test_windows, test_labels)
     test_loader = DataLoader(
@@ -417,7 +427,7 @@ def main():
     # Step 4: Initialize Augmentation (load from Phase 1)
     print("\n[4/6] Loading pre-trained Augmentation from Phase 1...")
     # Phase 1 checkpoint already loaded above
-    
+
     # Copy augmentation config from Phase 1 to Phase 2 config (for saving checkpoint)
     config["aug_kernel_size_cnn"] = phase1_config["aug_kernel_size_cnn"]
     config["aug_num_layers"] = phase1_config["aug_num_layers"]
@@ -426,7 +436,7 @@ def main():
     config["aug_hard_gumbel_softmax"] = phase1_config["aug_hard_gumbel_softmax"]
     config["aug_transformer_d_model"] = phase1_config["aug_transformer_d_model"]
     config["aug_transformer_nhead"] = phase1_config["aug_transformer_nhead"]
-    
+
     # Initialize augmentation with Phase 1 config
     augmentation = Augmentation(
         in_channels=n_channels,
@@ -477,8 +487,9 @@ def main():
     print("\n[7/7] Starting training...")
     print(f"  Epochs: {config['num_epochs']}")
     print(f"  Device: {config['device']}")
-    print(f"  Inference will run after each epoch")
+    print(f"  Inference will run only when loss decreases")
 
+    best_loss = float("inf")
     best_f1 = 0.0
     best_epoch = 0
 
@@ -498,51 +509,55 @@ def main():
         if trainer.scheduler is not None:
             trainer.scheduler.step(train_metrics["train_loss"])
 
-        # Run inference on test set
-        print(f"\nRunning inference on test set...")
-        inference_metrics = trainer.evaluate(
-            test_loader=test_loader,
-            labels=labels,
-            stride=config["stride"]
-        )
+        # Only run inference when loss decreases
+        if train_metrics["train_loss"] < best_loss:
+            best_loss = train_metrics["train_loss"]
 
-        # Get F1 score
-        f1_score = inference_metrics.get("best_f1", 0.0)
-
-        # Print inference metrics
-        print(f"\nEpoch {epoch} Inference Results:")
-        print(f"  F1-Score: {f1_score:.4f}")
-        print(f"  Precision: {inference_metrics.get('best_precision', 0.0):.4f}")
-        print(f"  Recall: {inference_metrics.get('best_recall', 0.0):.4f}")
-        print(f"  Accuracy: {inference_metrics.get('best_accuracy', 0.0):.4f}")
-
-        # Combine metrics for checkpoint
-        combined_metrics = {
-            **train_metrics,
-            "f1": f1_score,
-            "precision": inference_metrics.get("best_precision", 0.0),
-            "recall": inference_metrics.get("best_recall", 0.0),
-            "accuracy": inference_metrics.get("best_accuracy", 0.0),
-        }
-
-        # Save checkpoint when F1 improves
-        if f1_score > best_f1:
-            best_f1 = f1_score
-            best_epoch = epoch
-
-            save_path = os.path.join(
-                project_root,
-                config["save_dir"],
-                f"phase2_{config['dataset_name']}_{config['subset']}_best.pt",
+            # Run inference on test set
+            print(f"\nRunning inference on test set (loss improved)...")
+            inference_metrics = trainer.evaluate(
+                test_loader=test_loader, labels=labels, stride=config["stride"]
             )
-            trainer.save_checkpoint(save_path, epoch, combined_metrics)
-            print(f"  ✓ New best model! F1-Score: {best_f1:.4f} (Epoch {epoch})")
+
+            # Get F1 score
+            f1_score = inference_metrics.get("best_f1", 0.0)
+
+            # Print inference metrics
+            print(f"\nEpoch {epoch} Inference Results:")
+            print(f"  F1-Score: {f1_score:.4f}")
+            print(f"  Precision: {inference_metrics.get('best_precision', 0.0):.4f}")
+            print(f"  Recall: {inference_metrics.get('best_recall', 0.0):.4f}")
+            print(f"  Accuracy: {inference_metrics.get('best_accuracy', 0.0):.4f}")
+
+            # Combine metrics for checkpoint
+            combined_metrics = {
+                **train_metrics,
+                "f1": f1_score,
+                "precision": inference_metrics.get("best_precision", 0.0),
+                "recall": inference_metrics.get("best_recall", 0.0),
+                "accuracy": inference_metrics.get("best_accuracy", 0.0),
+            }
+
+            # Save checkpoint when F1 improves
+            if f1_score > best_f1:
+                best_f1 = f1_score
+                best_epoch = epoch
+
+                save_path = os.path.join(
+                    project_root,
+                    config["save_dir"],
+                    f"phase2_{config['dataset_name']}_{config['subset']}_best.pt",
+                )
+                trainer.save_checkpoint(save_path, epoch, combined_metrics)
+                print(f"  ✓ New best model! F1-Score: {best_f1:.4f} (Epoch {epoch})")
+        else:
+            print(f"  Loss did not improve (best: {best_loss:.6f}), skipping inference")
 
     print("\n" + "=" * 60)
     print("Training completed!")
     print(f"Best F1-Score: {best_f1:.4f} (Epoch {best_epoch})")
     print(
-        f"Saved checkpoint: phase2/checkpoints/phase2_{config['dataset_name']}_{config['subset']}_best.pt"
+        f"Saved checkpoint: checkpoints/phase2_{config['dataset_name']}_{config['subset']}_best.pt"
     )
     print("=" * 60)
 

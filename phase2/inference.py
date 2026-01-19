@@ -127,11 +127,11 @@ class Phase2Inference:
         self.augmentation = Augmentation(
             in_channels=self.config["n_channels"],
             seq_len=self.config["window_size"],
-            kernel_size=self.config["aug_kernel_size_cnn"],  
+            kernel_size=self.config["aug_kernel_size_cnn"],
             num_layers=self.config["aug_num_layers"],
             dropout=self.config["aug_dropout"],
             temperature=self.config["aug_temperature"],
-            hard=self.config["aug_hard_gumbel_softmax"],    
+            hard=self.config["aug_hard_gumbel_softmax"],
             transformer_d_model=self.config["aug_transformer_d_model"],
             transformer_nhead=self.config["aug_transformer_nhead"],
         )
@@ -167,9 +167,7 @@ class Phase2Inference:
             print(f"\n📊 Checkpoint metrics (from training):")
             print(f"  Train Loss: {metrics['train_loss']:.6f}")
 
-    def predict(
-        self, test_loader, stride=None, labels=None
-    ):
+    def predict(self, test_loader, stride=None, labels=None):
 
         print("\n🔮 Running inference...")
         print("  Applying inference masking:")
@@ -187,22 +185,22 @@ class Phase2Inference:
                 batch_data = batch_data.to(self.device)
                 batch_size = batch_data.shape[0]
 
-                # Apply inference masking with window index tracking
-                masked_data = batch_data.clone()
+                # Apply augmentation to get target (no masking)
+                target_data = self.augmentation(batch_data)
+
+                # Apply inference masking to augmented data with window index tracking
+                masked_target = target_data.clone()
                 for i in range(batch_size):
-                    window_data = batch_data[i : i + 1]  # (1, channels, seq_len)
+                    window_data = target_data[i : i + 1]  # (1, channels, seq_len)
                     masked_window = self.inference_masking(
                         window_data, window_idx=global_window_idx
                     )
-                    masked_data[i] = masked_window[0]
+                    masked_target[i] = masked_window[0]
                     global_window_idx += 1
 
-                # Apply augmentation to masked data
-                augmented_data = self.augmentation(masked_data)
-                reconstructed = self.agf_tcn(augmented_data)
-                timestep_losses = torch.mean(
-                    (reconstructed - augmented_data) ** 2, dim=1
-                )
+                # Reconstruct from masked augmented data
+                reconstructed = self.agf_tcn(masked_target)
+                timestep_losses = torch.mean((reconstructed - target_data) ** 2, dim=1)
 
                 all_timestep_scores.append(timestep_losses.cpu().numpy())
 

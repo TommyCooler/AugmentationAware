@@ -78,6 +78,7 @@ docs/_build/
 # Data and checkpoints (large files)
 data/datasets/
 checkpoints/
+phase2/checkpoints_phase2_full/
 *.pt
 *.pth
 *.ckpt
