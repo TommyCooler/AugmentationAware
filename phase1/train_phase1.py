@@ -281,8 +281,14 @@ def main():
     # Step 2: Load and prepare data
     print("\n[1/5] Loading and preparing data...")
     # Đảm bảo đường dẫn tính từ project root
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path_base = os.path.join(project_root, "data", "datasets")
+
+    # For Windows environment
+    # project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # data_path_base = os.path.join(project_root, "data", "datasets")
+
+    # For Kaggle environment
+    project_root = os.path.dirname("/kaggle/input/timeseriesdataset")
+    data_path_base = os.path.join(project_root, "datasets")
 
     all_train_windows, stats = prepare_phase1_data(
         datasets_info=datasets_info,

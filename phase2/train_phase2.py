@@ -338,8 +338,13 @@ def main():
     print("Phase 2: Supervised Anomaly Detection Training")
     print("=" * 60)
 
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path_base = os.path.join(project_root, "data", "datasets")
+    # For Windows environment
+    # project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # data_path_base = os.path.join(project_root, "data", "datasets")
+
+    # For Kaggle environment
+    project_root = os.path.dirname("/kaggle/input/timeseriesdataset")
+    data_path_base = os.path.join(project_root, "datasets")
 
     # Step 1: Load Phase 1 checkpoint to get window_size and stride
     print("\n[1/6] Loading Phase 1 checkpoint for window_size and stride...")

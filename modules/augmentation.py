@@ -80,39 +80,6 @@ class CNN1DCausalAugmentation(nn.Module):
         return x
 
 
-# class TCNAugmentation(nn.Module):
-#     def __init__(
-#         self,
-#         in_channels: int,
-#         kernel_size: int = 3,
-#         dropout: float = 0.1,
-#         causal: bool = True,
-#     ):
-
-#         super().__init__()
-#         self.in_channels = in_channels
-
-#         # 1 residual block, out_channels = in_channels → giữ nguyên số kênh
-#         num_channels = [in_channels]
-
-#         self.tcn = TCN(
-#             num_inputs=in_channels,
-#             num_channels=num_channels,
-#             kernel_size=kernel_size,
-#             dropout=dropout,
-#             causal=causal,
-#             use_norm="None",
-#             activation="relu",
-#             use_skip_connections=False,
-#             input_shape="NCL",
-#         )
-
-#     def forward(self, x):
-#         if x.dim() == 2:
-#             x = x.unsqueeze(1)
-#         return self.tcn(x)
-
-
 class LearnablePositionalEncoding(nn.Module):
 
     def __init__(self, d_model, max_len=5000, dropout=0.1):
