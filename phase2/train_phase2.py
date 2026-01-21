@@ -328,7 +328,7 @@ def main():
         "mask_ratio": 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
         # Phase 1 checkpoint (pre-trained augmentation)
         # "phase1_checkpoint": "phase1/checkpoints/psm_best_model.pth",
-        "phase1_checkpoint": "/kaggle/input/augmentation-aware-smd-phase-2/AugmentationAware/phase1/checkpoints/smdmachine-1-1_best_model.pth",
+        "phase1_checkpoint": "/kaggle/input/Augmentation Aware SMD phase 2/AugmentationAware/phase1/checkpoints/smdmachine-1-1_best_model.pth",
         # Misc
         "num_workers": 0,
         "save_dir": "phase2/checkpoints",
