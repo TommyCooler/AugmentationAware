@@ -254,12 +254,6 @@ class Augmentation(nn.Module):
             dropout=dropout,
         )
 
-        # self.tcn = TCNAugmentation(
-        #     in_channels=in_channels,
-        #     kernel_size=kernel_size,
-        #     dropout=dropout,
-        # )
-
         # Transformer with configurable hyperparameters
         self.transformer = TransformerEncoderAugmentation(
             in_channels=in_channels,
@@ -309,7 +303,6 @@ if __name__ == "__main__":
     model = Augmentation(
         in_channels=in_channels,
         seq_len=seq_len,
-        out_channels=64,
         kernel_size=3,
         num_layers=2,
         dropout=0.1,

@@ -308,18 +308,16 @@ def set_seed(seed=42):
 
 def main():
     set_seed(42)
-    # Configuration
+
     config = {
         # Data config
         "dataset_name": "smd",
-        "subset": "machine-1-1",  # Specific dataset: 135, 136, 137, or 138
+        "subset": "machine-1-1",
         # Model config
         "agf_tcn_channels": [256],  # TCN hidden channels
         "dropout": 0.1,
         "activation": "gelu",
         "fuse_type": 2,
-        # Training config
-        "batch_size": 64,
         "num_epochs": 50,
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
@@ -358,11 +356,12 @@ def main():
     )
     phase1_config = phase1_checkpoint["config"]
 
-    # Get window_size and stride from Phase 1
+    # Get window_size, stride, and batch_size from Phase 1
     config["window_size"] = phase1_config["window_size"]
     config["stride"] = phase1_config["stride"]
+    config["batch_size"] = phase1_config["batch_size"]
     print(
-        f"  ✓ Loaded window_size: {config['window_size']}, stride: {config['stride']} from Phase 1"
+        f"  ✓ Loaded window_size: {config['window_size']}, stride: {config['stride']}, batch_size: {config['batch_size']} from Phase 1"
     )
 
     # Step 2: Prepare data
@@ -487,7 +486,7 @@ def main():
     print("\n[7/7] Starting training...")
     print(f"  Epochs: {config['num_epochs']}")
     print(f"  Device: {config['device']}")
-    print(f"  Inference will run only when loss decreases")
+    print(f"  Inference runs every epoch, checkpoint saved when F1 improves")
 
     best_f1 = 0.0
     best_epoch = 0

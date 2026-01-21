@@ -143,7 +143,13 @@ class Phase1Trainer:
         avg_loss = total_loss / num_batches
         return avg_loss
 
-    def train(self, dataloader, num_epochs, save_dir="checkpoints", checkpoint_filename="best_model.pth"):
+    def train(
+        self,
+        dataloader,
+        num_epochs,
+        save_dir="checkpoints",
+        checkpoint_filename="best_model.pth",
+    ):
         """Full training loop"""
         os.makedirs(save_dir, exist_ok=True)
 
@@ -212,12 +218,12 @@ def main():
     set_seed(42)
     # Configuration
     config = {
-        "window_size": 16,
+        "window_size": 100,
         "stride": 1,
         "batch_size": 64,
         "num_epochs": 1000,
         "learning_rate": 1e-4,
-        "temperature": 0.07,
+        "temperature": 0.1,
         # Augmentation module
         "aug_transformer_d_model": 128,
         "aug_transformer_nhead": 2,
@@ -234,7 +240,7 @@ def main():
         "use_scheduler": False,  # Use learning rate scheduler
         "use_grad_clip": False,  # Use gradient clipping
         "max_grad_norm": 1.0,  # Max gradient norm for clipping
-        "mask_ratio": 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
+        "mask_ratio": 0.1,  # Percentage of time steps to mask (0.0 to 1.0)
     }
 
     print("=" * 60)
@@ -255,7 +261,7 @@ def main():
         # {"name": "ecg", "subset": "mitdb__100_180.pkl", "loader": "ecg"},
         # {"name": "pd", "subset": "power_data.pkl", "loader": "pd"},
         # {"name": "gesture", "subset": "ann_gun_CentroidA.pkl", "loader": "gesture"},
-        # {"name": "smd", "subset": "machine-1-1", "loader": "smd"},
+        {"name": "smd", "subset": "machine-1-1", "loader": "smd"},
         # {"name": "smd", "subset": "machine-2-1", "loader": "smd"},
         # {"name": "smd", "subset": "machine-3-2", "loader": "smd"},
         # {"name": "smd", "subset": "machine-3-7", "loader": "smd"},
@@ -295,10 +301,10 @@ def main():
     # Generate checkpoint filename from datasets
     dataset_names = []
     for ds_info in datasets_info:
-        if ds_info.get('subset'):
+        if ds_info.get("subset"):
             dataset_names.append(f"{ds_info['name']}{ds_info['subset']}")
         else:
-            dataset_names.append(ds_info['name'])
+            dataset_names.append(ds_info["name"])
     checkpoint_name = "_".join(dataset_names)
     checkpoint_filename = f"{checkpoint_name}_best_model.pth"
     print(f"\n  Checkpoint filename: {checkpoint_filename}")
@@ -367,10 +373,10 @@ def main():
 
     # Train
     trainer.train(
-        dataloader=dataloader, 
-        num_epochs=config["num_epochs"], 
+        dataloader=dataloader,
+        num_epochs=config["num_epochs"],
         save_dir="checkpoints",
-        checkpoint_filename=checkpoint_filename
+        checkpoint_filename=checkpoint_filename,
     )
 
     print("\n" + "=" * 60)
