@@ -291,7 +291,7 @@ def main():
     parser.add_argument(
         "--checkpoint",
         type=str,
-        default="phase2/checkpoints/phase2_ucr_135_best.pt",
+        default="phase2/checkpoints/phase2_psm_train_best.pt",
         help="Path to checkpoint file",
     )
     parser.add_argument(
