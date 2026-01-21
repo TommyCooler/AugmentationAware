@@ -343,7 +343,7 @@ def main():
     # data_path_base = os.path.join(project_root, "data", "datasets")
 
     # For Kaggle environment
-    project_root = os.path.dirname("/kaggle/input/timeseriesdataset")
+    project_root = os.path.dirname("/kaggle/input")
     data_path_base = os.path.join(project_root, "datasets")
 
     # Step 1: Load Phase 1 checkpoint to get window_size and stride
