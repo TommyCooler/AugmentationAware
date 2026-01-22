@@ -59,6 +59,7 @@ class Phase2Trainer:
         max_grad_norm: float = 1.0,
         config: dict = None,  # Store config for inference
         mask_ratio: float = 0.15,  # Random time masking ratio
+        phase1_config: dict = None,  # Store Phase 1 config for checkpoint
     ):
         self.augmentation = augmentation.to(device)
         self.agf_tcn = agf_tcn.to(device)
@@ -70,6 +71,7 @@ class Phase2Trainer:
         self.use_grad_clip = use_grad_clip
         self.max_grad_norm = max_grad_norm
         self.config = config or {}  # Store for saving to checkpoint
+        self.phase1_config = phase1_config or {}  # Store Phase 1 config
 
         # Freeze augmentation module
         self._freeze_augmentation()
@@ -286,14 +288,15 @@ class Phase2Trainer:
             "augmentation_state_dict": self.augmentation.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "metrics": metrics,
-            "config": self.config,  # Save full config for inference
+            "config": self.config,  # Save full Phase 2 config for inference
+            "phase1_config": self.phase1_config,  # Save full Phase 1 config
         }
 
         if self.scheduler is not None:
             checkpoint["scheduler_state_dict"] = self.scheduler.state_dict()
 
         torch.save(checkpoint, path)
-        print(f"  ✓ Checkpoint saved with config: {path}")
+        print(f"  ✓ Checkpoint saved with Phase 2 config and Phase 1 config: {path}")
 
 
 def set_seed(seed=42):
@@ -311,8 +314,8 @@ def main():
 
     config = {
         # Data config
-        "dataset_name": "smd",
-        "subset": "machine-1-1",
+        "dataset_name": "pd",
+        "subset": "",  # Subset name
         # Model config
         "agf_tcn_channels": [256],  # TCN hidden channels
         "dropout": 0.1,
@@ -327,8 +330,7 @@ def main():
         # Random time masking options
         "mask_ratio": 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
         # Phase 1 checkpoint (pre-trained augmentation)
-        # "phase1_checkpoint": "phase1/checkpoints/psm_best_model.pth",
-        "phase1_checkpoint": "/kaggle/input/augmentation-aware-smd-phase-2/AugmentationAware/phase1/checkpoints/smdmachine-1-1_best_model.pth",
+        "phase1_checkpoint": "phase1/checkpoints/smdmachine-1-1_best_model.pth",
         # Misc
         "num_workers": 0,
         "save_dir": "phase2/checkpoints",
@@ -340,17 +342,16 @@ def main():
     print("=" * 60)
 
     # For Windows environment
-    # project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # data_path_base = os.path.join(project_root, "data", "datasets")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_path_base = os.path.join(project_root, "data", "datasets")
 
     # For Kaggle environment
-    project_root = "/kaggle/input/timeseriesdataset"
-    data_path_base = os.path.join(project_root, "datasets")
+    # project_root = "/kaggle/input/timeseriesdataset"
+    # data_path_base = os.path.join(project_root, "datasets")
 
     # Step 1: Load Phase 1 checkpoint to get window_size and stride
     print("\n[1/6] Loading Phase 1 checkpoint for window_size and stride...")
-    # phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
-    phase1_checkpoint_path = os.chdir(config["phase1_checkpoint"])
+    phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
 
     if not os.path.exists(phase1_checkpoint_path):
         raise FileNotFoundError(
@@ -485,8 +486,9 @@ def main():
         use_scheduler=config["use_scheduler"],
         use_grad_clip=config["use_grad_clip"],
         max_grad_norm=config["max_grad_norm"],
-        config=config,  # Pass full config for checkpoint
+        config=config,  # Pass full Phase 2 config for checkpoint
         mask_ratio=config["mask_ratio"],
+        phase1_config=phase1_config,  # Pass full Phase 1 config
     )
 
     # Step 7: Training loop

@@ -111,7 +111,9 @@ class Phase2Inference:
         print(f"\n📦 Loading checkpoint: {checkpoint_path}")
 
         # Load checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint = torch.load(
+            checkpoint_path, map_location=device, weights_only=False
+        )
 
         # Extract config
         if "config" not in checkpoint:
@@ -122,6 +124,17 @@ class Phase2Inference:
         print(f"    Dataset: {self.config['dataset_name']}_{self.config['subset']}")
         print(f"    Window size: {self.config['window_size']}")
         print(f"    Channels: {self.config['n_channels']}")
+
+        # Load Phase 1 config if available
+        self.phase1_config = checkpoint.get("phase1_config", {})
+        if self.phase1_config:
+            print(f"\n  ✓ Phase 1 config loaded")
+            print(
+                f"    Augmentation kernel size: {self.phase1_config.get('aug_kernel_size_cnn', 'N/A')}"
+            )
+            print(
+                f"    Augmentation layers: {self.phase1_config.get('aug_num_layers', 'N/A')}"
+            )
 
         # Recreate Augmentation
         self.augmentation = Augmentation(
@@ -291,7 +304,7 @@ def main():
     parser.add_argument(
         "--checkpoint",
         type=str,
-        default="phase2/checkpoints/phase2_psm_train_best.pt",
+        default="checkpoints/phase2_smd_machine-1-1_0.9977_best.pt",
         help="Path to checkpoint file",
     )
     parser.add_argument(
@@ -345,12 +358,12 @@ def main():
 
     # Load data
     # For Windows environment
-    # project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # data_path_base = os.path.join(project_root, "data", "datasets")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_path_base = os.path.join(project_root, "data", "datasets")
 
     # For Kaggle environment
-    project_root = "/kaggle/input/timeseriesdataset"
-    data_path_base = os.path.join(project_root, "datasets")
+    # project_root = "/kaggle/input/timeseriesdataset"
+    # data_path_base = os.path.join(project_root, "datasets")
 
     dataloader_func = {
         "ucr": ucr_sub_ds_processing,
