@@ -108,13 +108,28 @@ def read_checkpoint_info(checkpoint_path, verbose=False):
 
         if "config" in checkpoint:
             config = checkpoint["config"]
+            print("\n┌─ PHASE 2 CONFIG:")
             if isinstance(config, dict):
-                print_dict_recursive(config, indent=0, max_depth=3)
+                print_dict_recursive(config, indent=1, max_depth=3)
             else:
                 print(f"Config type: {type(config)}")
                 print(config)
         else:
             print("❌ Không tìm thấy config trong checkpoint")
+
+        # Thông tin Phase 1 config (nếu có)
+        if "phase1_config" in checkpoint:
+            print("\n┌─ PHASE 1 CONFIG:")
+            phase1_config = checkpoint["phase1_config"]
+            if isinstance(phase1_config, dict):
+                print_dict_recursive(phase1_config, indent=1, max_depth=3)
+            else:
+                print(f"Phase 1 config type: {type(phase1_config)}")
+                print(phase1_config)
+        else:
+            print(
+                "\n⚠️  Không tìm thấy phase1_config trong checkpoint (có thể là checkpoint cũ)"
+            )
 
         # 3. Thông tin các state_dict
         print(f"\n{'='*80}")
