@@ -4,6 +4,9 @@ Hệ thống phát hiện dị thường (Anomaly Detection) hai giai đoạn s�
 
 ---
 
+Checkpoints: https://drive.google.com/drive/folders/1ss7Ozt4PV3sXGDkFHZLMn_93be-82GWV?usp=drive_link
+
+
 ## 📋 Mục Lục
 
 1. [Tổng Quan Kiến Trúc](#tổng-quan-kiến-trúc)
