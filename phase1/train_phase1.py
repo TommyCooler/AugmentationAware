@@ -94,10 +94,12 @@ class Phase1Trainer:
             batch_size = batch_windows.shape[0]
 
             # Apply random time masking before augmentation
-            masked_windows = self.time_masking(batch_windows)
+            # masked_windows = self.time_masking(batch_windows)
 
             # Apply augmentation to create positive pairs
-            augmented_windows = self.augmentation(masked_windows)
+            augmented_windows = self.augmentation(batch_windows)
+
+            # augmented_windows = self.time_masking(augmented_windows)
 
             # Encode both original and augmented
             z_original = self.encoder(batch_windows)  # (batch, proj_dim)
