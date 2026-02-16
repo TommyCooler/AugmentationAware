@@ -85,7 +85,7 @@ class Phase2Trainer:
         self.scheduler = None
         if use_scheduler:
             self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                self.optimizer, mode="min", factor=0.5, patience=5, verbose=True
+                self.optimizer, mode="min", factor=0.5, patience=5
             )
 
         # Reconstruction loss
@@ -318,17 +318,17 @@ def main():
         "subset": "",  # Subset name
         # Model config
         "agf_tcn_channels": [256],  # TCN hidden channels
-        "dropout": 0.1,
+        "dropout": 0,
         "activation": "gelu",
         "fuse_type": 2,
-        "num_epochs": 50,
+        "num_epochs": 100,
         "learning_rate": 1e-4,
         "weight_decay": 1e-6,
         "use_scheduler": False,  # Use learning rate scheduler
         "use_grad_clip": False,  # Use gradient clipping
         "max_grad_norm": 1.0,  # Max gradient norm for clipping
         # Random time masking options
-        "mask_ratio": 0.15,  # Percentage of time steps to mask (0.0 to 1.0)
+        "mask_ratio": 0.3,  # Percentage of time steps to mask (0.0 to 1.0)
         # Phase 1 checkpoint (pre-trained augmentation)
         "phase1_checkpoint": "phase1/checkpoints/smdmachine-1-1_best_model.pth",
         # Misc
@@ -379,7 +379,7 @@ def main():
     dataloader_func = {
         "ucr": ucr_sub_ds_processing,
         "smd": smd_sub_ds_processing,
-        "smap_msl": smap_msl_sub_ds_processing,
+        "smap_msl_": smap_msl_sub_ds_processing,
         "psm": psm_sub_ds_processing,
         "pd": pd_sub_ds_processing,
         "ecg": ecg_sub_ds_processing,

@@ -225,24 +225,24 @@ def main():
         "batch_size": 64,
         "num_epochs": 1000,
         "learning_rate": 1e-4,
-        "temperature": 0.1,
+        "temperature": 0.07,
         # Augmentation module
         "aug_transformer_d_model": 128,
         "aug_transformer_nhead": 2,
         "aug_kernel_size_cnn": 3,
         "aug_num_layers": 2,
-        "aug_dropout": 0.1,
+        "aug_dropout": 0,
         "aug_temperature": 1.0,
         "aug_hard_gumbel_softmax": False,
         # Encoder module
         "encoder_type": "mlp",
         "hidden_dims_mlp": [256],
         "projection_dim": 256,
-        "dropout_mlp": 0.1,
+        "dropout_mlp": 0,
         "use_scheduler": False,  # Use learning rate scheduler
         "use_grad_clip": False,  # Use gradient clipping
         "max_grad_norm": 1.0,  # Max gradient norm for clipping
-        "mask_ratio": 0.1,  # Percentage of time steps to mask (0.0 to 1.0)
+        "mask_ratio": 0.3,  # Percentage of time steps to mask (0.0 to 1.0)
     }
 
     print("=" * 60)
