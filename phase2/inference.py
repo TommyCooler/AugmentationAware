@@ -120,7 +120,9 @@ class Phase2Inference:
             raise ValueError("Checkpoint thiếu 'config'! Không thể tái tạo model.")
 
         self.config = checkpoint["config"]
+        self.best_epoch = checkpoint.get("epoch", "N/A")
         print(f"  ✓ Config loaded")
+        print(f"    Best checkpoint saved at epoch: {self.best_epoch}")
         print(f"    Dataset: {self.config['dataset_name']}_{self.config['subset']}")
         print(f"    Window size: {self.config['window_size']}")
         print(f"    Channels: {self.config['n_channels']}")
@@ -193,6 +195,9 @@ class Phase2Inference:
         self.inference_masking.reset()
         global_window_idx = 0
 
+        # Set fixed seed before inference to ensure deterministic masking for window 0
+        torch.manual_seed(42)
+
         with torch.no_grad():
             for batch_data, _ in tqdm(test_loader, desc="Computing anomaly scores"):
                 batch_data = batch_data.to(self.device)
@@ -260,6 +265,8 @@ class Phase2Inference:
         print("INFERENCE RESULTS")
         print("=" * 60)
 
+        print(f"Best checkpoint epoch: {self.best_epoch}")
+
         if "best_threshold" in metrics:
             print(f"\n🎯 Best Threshold Search:")
             print(f"  Best Threshold: {metrics['best_threshold']:.6f}")
@@ -304,7 +311,7 @@ def main():
     parser.add_argument(
         "--checkpoint",
         type=str,
-        default="checkpoints/phase2_smd_machine-1-1_0.9977_best.pt",
+        default="checkpoints/phase2_ecg_chfdbchf15.pkl_best.pt",
         help="Path to checkpoint file",
     )
     parser.add_argument(

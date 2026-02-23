@@ -239,6 +239,9 @@ class Phase2Trainer:
         all_timestep_scores = []
         global_window_idx = 0
 
+        # Set fixed seed before inference to ensure deterministic masking for window 0
+        torch.manual_seed(42)
+
         with torch.no_grad():
             for batch_data, _ in test_loader:
                 batch_data = batch_data.to(self.device)
