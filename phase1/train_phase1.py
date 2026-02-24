@@ -93,13 +93,8 @@ class Phase1Trainer:
             batch_windows = batch_windows.to(self.device)
             batch_size = batch_windows.shape[0]
 
-            # Apply random time masking before augmentation
-            # masked_windows = self.time_masking(batch_windows)
-
             # Apply augmentation to create positive pairs
             augmented_windows = self.augmentation(batch_windows)
-
-            # augmented_windows = self.time_masking(augmented_windows)
 
             # Encode both original and augmented
             z_original = self.encoder(batch_windows)  # (batch, proj_dim)
@@ -213,10 +208,7 @@ def set_seed(seed=42):
 
 
 def main():
-    """
-    Main training script for Phase 1.
-    Example: Train on UCR datasets 135-138
-    """
+
     set_seed(42)
     # Configuration
     config = {
@@ -242,7 +234,7 @@ def main():
         "use_scheduler": False,  # Use learning rate scheduler
         "use_grad_clip": False,  # Use gradient clipping
         "max_grad_norm": 1.0,  # Max gradient norm for clipping
-        "mask_ratio": 0.3,  # Percentage of time steps to mask (0.0 to 1.0)
+        "mask_ratio": 0.0,  # Percentage of time steps to mask (0.0 to 1.0)
     }
 
     print("=" * 60)
@@ -254,7 +246,7 @@ def main():
         # {"name": "ucr", "subset": "136", "loader": "ucr"},
         # {"name": "ucr", "subset": "137", "loader": "ucr"},
         # {"name": "ucr", "subset": "138", "loader": "ucr"},
-        {"name": "psm", "subset": None, "loader": "psm"},
+        # {"name": "psm", "subset": None, "loader": "psm"},
         # {"name": "ecg", "subset": "chfdb_chf01_275.pkl", "loader": "ecg"},
         # {"name": "ecg", "subset": "chfdb_chf13_45590.pkl", "loader": "ecg"},
         # {"name": "ecg", "subset": "chfdbchf15.pkl", "loader": "ecg"},
@@ -267,13 +259,14 @@ def main():
         # {"name": "smd", "subset": "machine-2-1", "loader": "smd"},
         # {"name": "smd", "subset": "machine-3-2", "loader": "smd"},
         # {"name": "smd", "subset": "machine-3-7", "loader": "smd"},
+        {"name": "smap_msl_", "subset": "C-1", "loader": "smap_msl_"},
     ]
 
     # Dataloader function mapping
     dataloader_func = {
         "ucr": ucr_sub_ds_processing,
         "smd": smd_sub_ds_processing,
-        "smap_msl": smap_msl_sub_ds_processing,
+        "smap_msl_": smap_msl_sub_ds_processing,
         "psm": psm_sub_ds_processing,
         "pd": pd_sub_ds_processing,
         "ecg": ecg_sub_ds_processing,

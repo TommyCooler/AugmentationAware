@@ -211,16 +211,6 @@ class Phase2Trainer:
                 last_timestep_score = timestep_scores_all_windows[i, -1]
                 timeseries_scores[last_time_step] = last_timestep_score
 
-        # Fill NaN values with forward fill
-        valid_mask = ~np.isnan(timeseries_scores)
-        if not valid_mask.all():
-            last_valid_idx = -1
-            for i in range(n_time_steps):
-                if valid_mask[i]:
-                    last_valid_idx = i
-                elif last_valid_idx >= 0:
-                    timeseries_scores[i] = timeseries_scores[last_valid_idx]
-
         return timeseries_scores
 
     def evaluate(self, test_loader, labels, stride):
