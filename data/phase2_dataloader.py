@@ -12,17 +12,9 @@ from data.sliding_window import create_sliding_windows
 
 
 class Phase2Dataset(Dataset):
-    """
-    Dataset for Phase 2: Returns windows with labels
-    Used for test/inference where labels are needed
-    """
 
     def __init__(self, data: np.ndarray, labels: np.ndarray):
-        """
-        Args:
-            data: shape (n_samples, n_channels, seq_len)
-            labels: shape (n_samples,) - binary labels (0: normal, 1: anomaly)
-        """
+
         self.data = torch.FloatTensor(data)
         self.labels = torch.FloatTensor(labels)
 
@@ -38,10 +30,6 @@ class Phase2Dataset(Dataset):
 
 
 class Phase2TrainDataset(Dataset):
-    """
-    Simple dataset for Phase 2 training: Only returns data (no labels needed)
-    Training data is all normal, so labels are not used in reconstruction task
-    """
 
     def __init__(self, data: np.ndarray):
         """
@@ -153,27 +141,10 @@ def create_phase2_dataloaders(
     batch_size: int = 32,
     num_workers: int = 4,
 ) -> Tuple[DataLoader, DataLoader]:
-    """
-    Create train and test dataloaders for Phase 2
-
-    Args:
-        train_windows: Training windows
-        train_labels: Training labels (not used in training, but kept for compatibility)
-        test_windows: Test windows
-        test_labels: Test labels
-        batch_size: Batch size
-        num_workers: Number of workers
-
-    Returns:
-        train_loader, test_loader
-    """
-    import torch
 
     use_cuda = torch.cuda.is_available()
 
-    # Training doesn't need labels (all normal data)
     train_dataset = Phase2TrainDataset(train_windows)
-    # Test needs labels for evaluation
     test_dataset = Phase2Dataset(test_windows, test_labels)
 
     train_loader = DataLoader(

@@ -229,7 +229,6 @@ class Phase2Trainer:
         all_timestep_scores = []
         global_window_idx = 0
 
-        # Set fixed seed before inference to ensure deterministic masking for window 0
         torch.manual_seed(42)
 
         with torch.no_grad():
@@ -338,10 +337,6 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_path_base = os.path.join(project_root, "data", "datasets")
 
-    # For Kaggle environment
-    # project_root = "/kaggle/input/timeseriesdataset"
-    # data_path_base = os.path.join(project_root, "datasets")
-
     # Step 1: Load Phase 1 checkpoint to get window_size and stride
     print("\n[1/6] Loading Phase 1 checkpoint for window_size and stride...")
     phase1_checkpoint_path = os.path.join(project_root, config["phase1_checkpoint"])
@@ -393,7 +388,6 @@ def main():
 
     # Step 3: Create train and test dataloaders
     print("\n[3/6] Creating dataloaders...")
-    # Training data is all normal, labels not needed for reconstruction task
     train_dataset = Phase2TrainDataset(train_windows)
     train_loader = DataLoader(
         train_dataset,

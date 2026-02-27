@@ -368,10 +368,6 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_path_base = os.path.join(project_root, "data", "datasets")
 
-    # For Kaggle environment
-    # project_root = "/kaggle/input/timeseriesdataset"
-    # data_path_base = os.path.join(project_root, "datasets")
-
     dataloader_func = {
         "ucr": ucr_sub_ds_processing,
         "smd": smd_sub_ds_processing,

@@ -25,7 +25,6 @@ class RandomTimeMasking(nn.Module):
         if n_mask <= 0:
             return x
 
-        # chọn ngẫu nhiên các time-step để mask, dùng chung cho cả batch & channel
         mask_indices = torch.randperm(T, device=x.device)[:n_mask]  # [n_mask]
 
         # mask theo time-step: True = keep, False = mask

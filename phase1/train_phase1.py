@@ -281,10 +281,6 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_path_base = os.path.join(project_root, "data", "datasets")
 
-    # For Kaggle environment
-    # project_root = "/kaggle/input/timeseriesdataset"
-    # data_path_base = os.path.join(project_root, "datasets")
-
     all_train_windows, stats = prepare_phase1_data(
         datasets_info=datasets_info,
         window_size=config["window_size"],

@@ -12,10 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 class Phase1TrainDataset(Dataset):
-    """
-    Simple dataset for Phase 1 training: Only returns windows (no labels needed)
-    Training data is all normal, used for contrastive learning
-    """
 
     def __init__(self, all_windows: np.ndarray):
         self.windows = torch.from_numpy(all_windows).float()
@@ -61,7 +57,6 @@ def prepare_phase1_data(
 
         loader_func = dataloader_func[loader_name]
 
-        # Load train data (không cần test labels trong phase 1)
         train_data, _, _ = loader_func(
             data_path=data_path, filename=subset, normalized=True
         )
