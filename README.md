@@ -1,1 +1,2 @@
-Checkpoints: https://drive.google.com/drive/folders/1ss7Ozt4PV3sXGDkFHZLMn_93be-82GWV?usp=drive_link
+Checkpoints: 
+Results and Configuration: https://docs.google.com/spreadsheets/d/1XV5lgOVQYAZHydmYPkANTOU_VrdZ5PCWs_KY3x2Ne0k/edit?usp=sharing
